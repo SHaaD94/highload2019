@@ -5,9 +5,10 @@ import com.shaad.highload2018.configuration.BaseModule
 import com.shaad.highload2018.web.Server
 
 fun main(args: Array<String>) {
-    Guice.createInjector(
+    val injector = Guice.createInjector(
         BaseModule()
     )
-        .getInstance(Server::class.java)
+    injector.getInstance(DataFiller::class.java).fill()
+    injector.getInstance(Server::class.java)
         .listen(80)
 }

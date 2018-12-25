@@ -2,6 +2,7 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 import org.gradle.internal.impldep.org.apache.maven.model.Build
 import org.jetbrains.kotlin.contracts.model.structure.UNKNOWN_COMPUTATION.type
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jetbrains.kotlin.serialization.js.DynamicTypeDeserializer.id
 
 group = "highload"
 version = "1.0-SNAPSHOT"
@@ -18,7 +19,7 @@ buildscript {
 
 plugins {
     kotlin("jvm") version "1.3.10"
-    id("com.github.johnrengelman.shadow")
+    id("com.github.johnrengelman.shadow") version "4.0.3"
 }
 
 repositories {
@@ -27,7 +28,11 @@ repositories {
 
 dependencies {
     compile(kotlin("stdlib-jdk8"))
-    compile("com.dslplatform", "dsl-json", "1.8.4")
+//    compile("com.dslplatform", "dsl-json-java", "1.8.4")
+//    kapt("com.dslplatform","dsl-json-java8","1.8.4")
+    compile("com.fasterxml.jackson.core", "jackson-core", "2.9.8")
+    compile("com.fasterxml.jackson.module", "jackson-module-kotlin", "2.9.8")
+
     compile("org.rapidoid", "rapidoid-http-server", "5.5.5")
     compile("com.google.inject", "guice", "4.2.2")
     compile("com.google.inject.extensions", "guice-multibindings", "4.2.2")
@@ -37,7 +42,7 @@ tasks.withType<KotlinCompile> {
     kotlinOptions.jvmTarget = "1.8"
 }
 
-val shadowJar = tasks.withType<ShadowJar> {
+tasks.withType<ShadowJar> {
     archiveName = "server.jar"
     mergeServiceFiles()
     exclude("META-INF/.SF", "META-INF/.DSA", "META-INF/.RSA")

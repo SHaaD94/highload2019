@@ -1,22 +1,22 @@
 package com.shaad.highload2018.domain
 
-class Account(
+data class Account(
     val id: Int,
     // max 100 symbols, unique
-    val emain: ByteArray,
+    val email: String,
     // max 50 symbols
-    val fname: ByteArray?,
-    val sname: ByteArray?,
+    val fname: String?,
+    val sname: String?,
     // max 16 symbols unique
-    val phone: ByteArray?,
+    val phone: String?,
     // m or f
     val sex: Char,
     // from 01.01.1950 to 01.01.2005
     val birth: Long,
     // max 50 symbols
-    val country: ByteArray?,
+    val country: String?,
     // max 50 symbols
-    val city: ByteArray?,
+    val city: String?,
 
     //------------
 
@@ -24,21 +24,21 @@ class Account(
     val joined: Long,
 
     //"свободны", "заняты", "всё сложно"
-    val status: ByteArray,
+    val status: String,
 
     //max 100 symbols each
-    val interests: List<ByteArray>,
+    val interests: List<String>?,
 
     val premium: Premium?,
 
-    val likes: List<Like>
+    val likes: List<Like>?
 )
 
 //min 01.01.2018
-class Premium(val start: Long, val finish: Long) {
+data class Premium(val start: Long, val finish: Long) {
     init {
         check(start < finish)
     }
 }
 
-class Like(val id: Int, val ts: Long)
+data class Like(val id: Int, val ts: Long)
