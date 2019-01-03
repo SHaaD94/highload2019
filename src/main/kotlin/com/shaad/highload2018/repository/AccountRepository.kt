@@ -40,7 +40,7 @@ class AccountRepositoryImpl : AccountRepository {
 
     override fun addAccount(account: Account) {
         withLockById(account.id) {
-            check(accounts[account.id] != null) { "User ${account.id} already exists" }
+            check(accounts[account.id] == null) { "User ${account.id} already exists" }
             accounts[account.id] = account
 
             account.fname?.let {

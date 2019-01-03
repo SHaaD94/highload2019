@@ -2,80 +2,222 @@ package com.shaad.highload2018.web.get
 
 import com.google.inject.Inject
 import com.shaad.highload2018.repository.AccountRepository
-import com.shaad.highload2018.web.Handler
+import com.shaad.highload2018.web.HandlerBase
 import org.rapidoid.buffer.Buf
 import org.rapidoid.bytes.BytesUtil
 import org.rapidoid.data.BufRange
 import org.rapidoid.http.HttpVerb
 
-class AccountsFilter @Inject constructor(val repository: AccountRepository) : Handler {
+class AccountsFilter @Inject constructor(val repository: AccountRepository) : HandlerBase() {
     private val path = "/accounts/filter/".toByteArray()
     override fun method(): HttpVerb = HttpVerb.GET
 
     override fun matches(buf: Buf, pathRange: BufRange): Boolean =
         BytesUtil.match(buf.bytes(), pathRange.start, path, true)
 
+    //todo bad requests
     override fun process(buf: Buf, pathRange: BufRange, paramsRange: BufRange, bodyRange: BufRange): ByteArray {
+        val params = parseParams(buf, paramsRange)
+
+        var limit = 0L
+        var sexEq: Char? = null
+        var emailDomain: String? = null
+        var emailGt: String? = null
+        var emailLt: String? = null
+
+        var statusEq: String? = null
+        var statusNeq: String? = null
+
+        var snameEq: String? = null
+        var snameStarts: String? = null
+        var snameNull: String? = null
+
+        var fnameEq: String? = null
+        var fnameAny: String? = null
+        var fnameNull: String? = null
+
+        var phoneCode: String? = null
+        var phoneNull: String? = null
+
+        var countryEq: String? = null
+        var countryNull: String? = null
+
+        var cityEq: String? = null
+        var cityAny: String? = null
+        var cityNull: String? = null
+
+        var birthLt: Long? = null
+        var birthGt: Long? = null
+        var birthYear: Int? = null
+
+        var interestsContains: String? = null
+        var interestsAny: String? = null
+
+        var likesContains: String? = null
+
+        var premiumNow: String? = null
+        var premiumNull: String? = null
+
+        params.forEach { (param, value) ->
+            when (param) {
+                "limit" -> limit = value.toLong()
+                "sex_eq" -> sexEq = value[0]
+
+                "email_domain" -> emailDomain = value
+                "email_lt" -> emailLt = value
+                "email_gt" -> emailGt = value
+
+                "status_eq" -> statusEq = value
+                "status_neq" -> statusNeq = value
+
+                "sname_eq" -> snameEq = value
+                "sname_starts" -> snameStarts = value
+                "sname_null" -> snameNull = value
+
+                "fname_eq" -> fnameEq = value
+                "fname_any" -> fnameAny = value
+                "fname_null" -> fnameNull = value
+
+                "phone_code" -> phoneCode = value
+                "phone_null" -> phoneNull = value
+
+                "country_eq" -> countryEq = value
+                "country_null" -> countryNull = value
+
+                "city_eq" -> cityEq = value
+                "city_any" -> cityAny = value
+                "city_null" -> cityNull = value
+
+                "birth_lt" -> birthLt = value.toLong()
+                "birth_gt" -> birthGt = value.toLong()
+                "birth_year" -> birthYear = value.toInt()
+
+                "interests_contains" -> interestsContains = value
+                "interests_any" -> interestsAny = value
+
+                "likes_contains" -> likesContains = value
+
+                "premium_now" -> premiumNow = value
+                "premium_null" -> premiumNull = value
+
+                "query_id" -> {
+                }
+
+                else -> throw RuntimeException("Unsupported param $param")
+            }
+        }
+
+        val sexRequest = sexEq?.let { SexRequest(it) }
+
+        val emailRequest = if (emailDomain != null || emailGt != null || emailLt != null)
+            EmailRequest(emailDomain, emailLt, emailGt)
+        else null
+
+        val statusRequest = if (statusEq != null || statusNeq != null)
+            StatusRequest(statusEq, statusNeq)
+        else null
+
+        val fnameRequest = if (fnameAny != null || fnameEq != null || fnameNull == null)
+            FnameRequest(statusEq, fnameAny?.split(","), parseNull(fnameNull))
+        else null
+
+        val snameRequest = if (snameEq != null || snameStarts != null || snameNull == null)
+            SnameRequest(statusEq, snameStarts, parseNull(snameNull))
+        else null
+
+        val phoneRequest = if (phoneCode != null || phoneNull != null)
+            PhoneRequest(phoneCode, parseNull(phoneNull))
+        else null
+
+        val countryRequest = if (countryEq != null || countryNull != null)
+            CountryRequest(countryEq, parseNull(countryNull))
+        else null
+
+        val cityRequest = if (cityAny != null || cityEq != null || cityNull != null)
+            CityRequest(cityEq, cityAny?.split(","), parseNull(cityNull))
+        else null
+
+        val birthRequest = if (birthGt != null || birthLt != null || birthYear != null)
+            BirthRequest(birthLt, birthLt, birthYear)
+        else null
+
+        val interestsRequest = if (interestsAny != null || interestsContains != null)
+            InterestsRequest(interestsAny?.split(","), interestsContains?.split(","))
+        else null
+
+        val likesRequest = if (likesContains != null)
+            LikesRequest(likesContains?.split(",")?.map { it.toInt() })
+        else null
+
+        val premium = if (premiumNow != null || premiumNull != null)
+        //todo support premium
+        //PremiumRequest(null, null)
+            null
+        else null
 
         val filterRequest = FilterRequest(
-            null, null, null, null, null, null,
-            null, null, null, null, null, null
+            limit,
+            sexRequest, emailRequest, statusRequest, fnameRequest, snameRequest, phoneRequest,
+            countryRequest, cityRequest, birthRequest, interestsRequest, likesRequest, premium
         )
-        repository.filter(filterRequest)
 
-        return "".toByteArray()
+        val response = repository.filter(filterRequest)
+
+        return objectMapper.writeValueAsBytes(response)
     }
+
+    private fun parseNull(value: String?): Boolean? =
+        when (value) {
+            "0" -> true
+            "1" -> false
+            null -> null
+            else -> throw RuntimeException("Incorrect null $value")
+        }
 }
 
-class Eq<T>(val value: T)
-class Neq<T>(val value: T)
-class Lt<T>(val value: T)
-class Gt<T>(val value: T)
-class Null(val exists: Boolean)
-
-class SexRequest(val eq: Eq<Char>)
+class SexRequest(val eq: Char)
 class EmailRequest(
-    val domain: String,
-    val lt: Lt<Long>?,
-    val gt: Gt<Long>?
+    val domain: String?,
+    val lt: String?,
+    val gt: String?
 )
 
 class StatusRequest(
-    val eq: Eq<String>?,
-    val neq: Neq<String>?
+    val eq: String?,
+    val neq: String?
 )
 
 class FnameRequest(
-    val eq: Eq<String>?,
-    val any: List<Eq<String>>?,
-    val nill: List<Null>?
+    val eq: String?,
+    val any: List<String>?,
+    val nill: Boolean?
 )
 
 class SnameRequest(
-    val eq: Eq<String>?,
+    val eq: String?,
     val starts: String?,
-    val nill: List<Null>?
+    val nill: Boolean?
 )
 
 class PhoneRequest(
     val code: String?,
-    val nill: Null?
+    val nill: Boolean?
 )
 
 class CountryRequest(
-    val eq: Eq<String>?,
-    val nill: Null?
+    val eq: String?,
+    val nill: Boolean?
 )
 
 class CityRequest(
-    val eq: Eq<String>?,
-    val any: List<Eq<String>>?,
-    val nill: List<Null>?
+    val eq: String?,
+    val any: List<String>?,
+    val nill: Boolean?
 )
 
 class BirthRequest(
-    val lt: Lt<Long>?,
-    val gt: Gt<Long>?,
+    val lt: Long?,
+    val gt: Long?,
     val year: Int?
 )
 
@@ -85,15 +227,16 @@ class InterestsRequest(
 )
 
 class LikesRequest(
-    val any: List<Int>
+    val contains: List<Int>?
 )
 
 class PremiumRequest(
     val now: Boolean?,
-    val nill: Null?
+    val nill: Boolean?
 )
 
 class FilterRequest(
+    val limit: Long,
     val sex: SexRequest?,
     val email: EmailRequest?,
     val status: StatusRequest?,

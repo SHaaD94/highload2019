@@ -17,9 +17,15 @@ class Server @Inject constructor(handlers: @JvmSuppressWildcards Set<Handler>) :
         val method = buf.get(data.verb)
         return method2Handler[method]
             ?.firstOrNull { it.matches(buf, data.path) }
-            ?.process(buf, data.path, data.query, data.body)
             ?.let {
-                ok(ctx, true, it, json)
+                kotlin.runCatching { it.process(buf, data.path, data.query, data.body) }
+                    .onSuccess {
+                        ok(ctx, true, it, json)
+                    }
+                    .onFailure {
+                        //todo 400 exceptions handling
+                        ok(ctx, true, "".toByteArray(), json)
+                    }.getOrNull()
                 HttpStatus.DONE
             }
             ?: HttpStatus.NOT_FOUND
