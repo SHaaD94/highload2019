@@ -24,7 +24,8 @@ class Server @Inject constructor(handlers: @JvmSuppressWildcards Set<Handler>) :
                     }
                     .onFailure {
                         //todo 400 exceptions handling
-                        ok(ctx, true, "".toByteArray(), json)
+                        it.printStackTrace()
+                        ok(ctx, true, it.message?.toByteArray(), json)
                     }.getOrNull()
                 HttpStatus.DONE
             }

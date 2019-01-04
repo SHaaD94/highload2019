@@ -124,7 +124,7 @@ class AccountRepositoryImpl : AccountRepository {
             filterByNull(nill, fnameIndex, result)
         } ?: ids
 
-        val filteredBySname = filterRequest.sname?.let { (eq, starts, nill) ->
+        val filteredBySname = filterRequest.sname?.let { (eq, _, nill) ->
             val filteredByEq = if (eq != null) snameIndex[eq] ?: emptyList() else ids
             filterByNull(nill, snameIndex, filteredByEq)
         } ?: ids

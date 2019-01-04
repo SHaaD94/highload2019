@@ -11,7 +11,7 @@ import java.util.zip.ZipFile
 private class Accounts(val accounts: List<Account>)
 
 class DataFiller @Inject constructor(private val accountRepository: AccountRepository) {
-    private val dataPath = "/tmp/data.zip"
+    private val dataPath = "/tmp/data/data.zip"
 
     fun fill() {
         val objectMapper = jacksonObjectMapper()

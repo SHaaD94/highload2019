@@ -1,5 +1,7 @@
 package com.shaad.highload2018.domain
 
+import com.fasterxml.jackson.annotation.JsonIgnore
+
 data class Account(
     val id: Int,
     // max 100 symbols, unique
@@ -27,10 +29,12 @@ data class Account(
     val status: String,
 
     //max 100 symbols each
+    @JsonIgnore
     val interests: List<String>?,
 
     val premium: Premium?,
 
+    @JsonIgnore
     val likes: List<Like>?
 )
 

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.rapidoid.buffer.Buf
 import org.rapidoid.data.BufRange
 import org.rapidoid.http.HttpVerb
+import org.rapidoid.util.Msc
 
 interface Handler {
     fun method(): HttpVerb
@@ -19,7 +20,7 @@ abstract class HandlerBase : Handler {
             .split("&")
             .map { it.split("=") }
             .filter { it.size == 2 }
-            .map { it[0] to it[1] }
+            .map { it[0] to Msc.urlDecodeOrKeepOriginal(it[1]) }
             .toMap()
     }
 }
