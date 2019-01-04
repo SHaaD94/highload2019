@@ -184,12 +184,12 @@ class AccountRepositoryImpl : AccountRepository {
         )
 
         val filteredByPremium = filterRequest.premium?.let { (now, nill) ->
-            val filteredByNow = if (now == null) firstResult.filter { premiumIndex[it] == true } else firstResult
+            val filteredByNow = if (now != null) firstResult.filter { premiumIndex[it] == true } else firstResult
             if (nill != null) {
                 //todo probably build in init block
                 when (nill) {
-                    true -> filteredByNow.filter { premiumIndex.contains(it) }
-                    false -> filteredByNow.filter { !premiumIndex.contains(it) }
+                    true -> filteredByNow.filter { premiumIndex.containsKey(it) }
+                    false -> filteredByNow.filter { !premiumIndex.containsKey(it) }
                 }
             } else filteredByNow
         } ?: firstResult

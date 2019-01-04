@@ -19,7 +19,7 @@ class AccountsFilter @Inject constructor(val repository: AccountRepository) : Ha
     override fun process(buf: Buf, pathRange: BufRange, paramsRange: BufRange, bodyRange: BufRange): ByteArray {
         val params = parseParams(buf, paramsRange)
 
-        var limit = 0
+        var limit = -1
         var sexEq: Char? = null
         var emailDomain: String? = null
         var emailGt: String? = null
@@ -106,6 +106,8 @@ class AccountsFilter @Inject constructor(val repository: AccountRepository) : Ha
                 else -> throw RuntimeException("Unsupported param $param")
             }
         }
+
+        require(limit >= 0) { "limit should be specified" }
 
         val sexRequest = sexEq?.let { SexRequest(it) }
 
