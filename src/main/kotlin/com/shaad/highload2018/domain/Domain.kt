@@ -29,12 +29,10 @@ data class Account(
     val status: String,
 
     //max 100 symbols each
-    @JsonIgnore
     val interests: List<String>?,
 
     val premium: Premium?,
 
-    @JsonIgnore
     val likes: List<Like>?
 )
 

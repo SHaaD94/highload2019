@@ -2,6 +2,7 @@ package com.shaad.highload2018.repository
 
 import com.shaad.highload2018.domain.Account
 import com.shaad.highload2018.utils.concurrentHashSet
+import com.shaad.highload2018.utils.customIntersects
 import com.shaad.highload2018.utils.now
 import com.shaad.highload2018.utils.parsePhoneCode
 import com.shaad.highload2018.web.get.FilterRequest
@@ -97,16 +98,20 @@ class AccountRepositoryImpl : AccountRepository {
 
         val filteredByEmail = filterRequest.email?.let { (domain, lt, gt) ->
             val filteredByDomain = if (domain != null) emailDomainIndex[domain] ?: emptyList() else ids
-            val filteredByLt = if (lt != null) emailComparingIndex.tailMap(lt).values else ids
-            val filteredByGt = if (gt != null) emailComparingIndex.headMap(gt).values else ids
-            filteredByDomain.intersect(filteredByLt).intersect(filteredByGt)
+            val filteredByBorders = when {
+                lt != null && gt != null -> emailComparingIndex.subMap(lt, gt)
+                lt != null -> emailComparingIndex.headMap(lt)
+                gt != null -> emailComparingIndex.tailMap(gt)
+                else -> null
+            }?.values ?: ids
+            customIntersects(ids, filteredByDomain, filteredByBorders)
         } ?: ids
 
         val filteredByFname = filterRequest.fname?.let { (eq, any, nill) ->
             val filteredByEq = if (eq != null) fnameIndex[eq] ?: emptyList() else ids
             val filteredByAny = if (any != null) any.flatMap { fnameIndex[eq] ?: emptyList<Int>() } else ids
 
-            val result = filteredByEq.intersect(filteredByAny)
+            val result = customIntersects(ids, filteredByEq, filteredByAny)
             filterByNull(nill, fnameIndex, result)
         } ?: ids
 
@@ -129,19 +134,24 @@ class AccountRepositoryImpl : AccountRepository {
             val filteredByEq = if (eq != null) cityIndex[eq] ?: emptyList() else ids
             val filteredByAny = if (any != null) any.flatMap { cityIndex[eq] ?: emptyList<Int>() } else ids
 
-            val result = filteredByEq.intersect(filteredByAny)
+            val result = customIntersects(ids, filteredByEq, filteredByAny)
             filterByNull(nill, cityIndex, result)
         } ?: ids
 
         val filteredByBirth = filterRequest.birth?.let { (lt, gt, year) ->
-            val filteredByLt = if (lt != null) birthIndex.tailMap(lt).values else ids
-            val filteredByGt = if (gt != null) birthIndex.headMap(gt).values else ids
+            val filteredByBorders = when {
+                lt != null && gt != null -> birthIndex.subMap(lt, gt)
+                lt != null -> birthIndex.headMap(lt)
+                gt != null -> birthIndex.tailMap(gt)
+                else -> null
+            }?.values ?: ids
+
             val filteredByYear = if (year != null) {
                 val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC)
                 val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC) - 1
                 birthIndex.tailMap(from).headMap(to).values
             } else ids
-            filteredByLt.intersect(filteredByGt).intersect(filteredByYear)
+            customIntersects(ids, filteredByBorders, filteredByYear)
         } ?: ids
 
         val filteredByInterests = filterRequest.interests?.let { (contains, any) ->
@@ -151,7 +161,7 @@ class AccountRepositoryImpl : AccountRepository {
             val filteredByAny = any?.let { interests ->
                 interests.flatMap { interestIndex[it] ?: emptyList<Int>() }.toSet()
             } ?: ids
-            filteredByContains.intersect(filteredByAny)
+            customIntersects(ids, filteredByContains, filteredByAny)
         } ?: ids
 
         val filteredByLikes = filterRequest.likes?.let { (contains) ->
@@ -160,15 +170,18 @@ class AccountRepositoryImpl : AccountRepository {
             } ?: ids
         } ?: ids
 
-        val firstResult = filteredByEmail
-            .intersect(filteredByFname)
-            .intersect(filteredBySname)
-            .intersect(filteredByPhone)
-            .intersect(filteredByCountry)
-            .intersect(filteredByCity)
-            .intersect(filteredByBirth)
-            .intersect(filteredByInterests)
-            .intersect(filteredByLikes)
+        val firstResult = customIntersects(
+            ids,
+            filteredByEmail,
+            filteredByFname,
+            filteredBySname,
+            filteredByPhone,
+            filteredByCountry,
+            filteredByCity,
+            filteredByBirth,
+            filteredByInterests,
+            filteredByLikes
+        )
 
         val filteredByPremium = filterRequest.premium?.let { (now, nill) ->
             val filteredByNow = if (now == null) firstResult.filter { premiumIndex[it] == true } else firstResult

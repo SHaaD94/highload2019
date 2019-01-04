@@ -169,7 +169,7 @@ class AccountsFilter @Inject constructor(val repository: AccountRepository) : Ha
             countryRequest?.let { resultObj["country"] = acc.country }
             cityRequest?.let { resultObj["city"] = acc.city }
             birthRequest?.let { resultObj["birth"] = acc.birth }
-            premiumRequest?.let { resultObj["premium"] = acc.birth }
+            premiumRequest?.let { resultObj["premium"] = acc.premium }
             resultObj
         })
 

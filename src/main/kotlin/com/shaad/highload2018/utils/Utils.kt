@@ -22,6 +22,22 @@ fun parsePhoneCode(phone: String): String {
     throw RuntimeException("Failed to parse code of phone $phone")
 }
 
-fun <K> concurrentHashSet() : MutableSet<K> = ConcurrentHashMap.newKeySet()
+fun <K> concurrentHashSet(): MutableSet<K> = ConcurrentHashMap.newKeySet()
 
 fun now() = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
+
+fun <T> customIntersects(
+    sourceCollection: Collection<T>,
+    vararg collections: Collection<T>
+): Collection<T> {
+    val notSourceCollection = collections.filter { it !== sourceCollection }
+    if (notSourceCollection.isEmpty()) return sourceCollection
+    return notSourceCollection.reduce { ac, collection -> ac.intersect(collection) }
+}
+
+fun <T> measureTimeAndReturnResult(opName: String = "", block: () -> T): T {
+    val start = System.currentTimeMillis()
+    val res = block()
+    println(opName + " " + (System.currentTimeMillis() - start))
+    return res
+}
