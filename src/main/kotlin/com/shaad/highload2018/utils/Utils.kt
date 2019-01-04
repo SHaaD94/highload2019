@@ -2,6 +2,7 @@ package com.shaad.highload2018.utils
 
 import java.time.LocalDateTime
 import java.time.ZoneOffset
+import java.util.concurrent.ConcurrentHashMap
 
 fun parsePhoneCode(phone: String): String {
     var code = ""
@@ -20,5 +21,7 @@ fun parsePhoneCode(phone: String): String {
     }
     throw RuntimeException("Failed to parse code of phone $phone")
 }
+
+fun <K> concurrentHashSet() : MutableSet<K> = ConcurrentHashMap.newKeySet()
 
 fun now() = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)

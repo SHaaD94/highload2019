@@ -117,12 +117,12 @@ class AccountsFilter @Inject constructor(val repository: AccountRepository) : Ha
             StatusRequest(statusEq, statusNeq)
         else null
 
-        val fnameRequest = if (fnameAny != null || fnameEq != null || fnameNull == null)
-            FnameRequest(statusEq, fnameAny?.split(","), parseNull(fnameNull))
+        val fnameRequest = if (fnameAny != null || fnameEq != null || fnameNull != null)
+            FnameRequest(fnameEq, fnameAny?.split(","), parseNull(fnameNull))
         else null
 
-        val snameRequest = if (snameEq != null || snameStarts != null || snameNull == null)
-            SnameRequest(statusEq, snameStarts, parseNull(snameNull))
+        val snameRequest = if (snameEq != null || snameStarts != null || snameNull != null)
+            SnameRequest(snameEq, snameStarts, parseNull(snameNull))
         else null
 
         val phoneRequest = if (phoneCode != null || phoneNull != null)
@@ -149,19 +149,29 @@ class AccountsFilter @Inject constructor(val repository: AccountRepository) : Ha
             LikesRequest(likesContains?.split(",")?.map { it.toInt() })
         else null
 
-        val premium = if (premiumNow != null || premiumNull != null)
-        //todo support premium
-        //PremiumRequest(null, null)
-            null
+        val premiumRequest = if (premiumNow != null || premiumNull != null)
+            PremiumRequest(null, parseNull(premiumNull))
         else null
 
         val filterRequest = FilterRequest(
             limit,
             sexRequest, emailRequest, statusRequest, fnameRequest, snameRequest, phoneRequest,
-            countryRequest, cityRequest, birthRequest, interestsRequest, likesRequest, premium
+            countryRequest, cityRequest, birthRequest, interestsRequest, likesRequest, premiumRequest
         )
 
-        val response = repository.filter(filterRequest)
+        val response = mapOf("accounts" to repository.filter(filterRequest).map { acc ->
+            val resultObj = mutableMapOf<String, Any?>("id" to acc.id, "email" to acc.email)
+            sexRequest?.let { resultObj["sex"] = acc.sex }
+            statusRequest?.let { resultObj["status"] = acc.status }
+            fnameRequest?.let { resultObj["fname"] = acc.fname }
+            snameRequest?.let { resultObj["sname"] = acc.sname }
+            phoneRequest?.let { resultObj["phone"] = acc.phone }
+            countryRequest?.let { resultObj["country"] = acc.country }
+            cityRequest?.let { resultObj["city"] = acc.city }
+            birthRequest?.let { resultObj["birth"] = acc.birth }
+            premiumRequest?.let { resultObj["premium"] = acc.birth }
+            resultObj
+        })
 
         return objectMapper.writeValueAsBytes(response)
     }

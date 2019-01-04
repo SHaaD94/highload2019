@@ -1,6 +1,7 @@
 package com.shaad.highload2018.repository
 
 import com.shaad.highload2018.domain.Account
+import com.shaad.highload2018.utils.concurrentHashSet
 import com.shaad.highload2018.utils.now
 import com.shaad.highload2018.utils.parsePhoneCode
 import com.shaad.highload2018.web.get.FilterRequest
@@ -46,58 +47,43 @@ class AccountRepositoryImpl : AccountRepository {
             accounts[account.id] = account
 
             account.fname?.let {
-                val collection = fnameIndex.computeIfAbsent(it) { LinkedHashSet() }
-                synchronized(collection) {
-                    collection.add(account.id)
-                }
+                val collection = fnameIndex.computeIfAbsent(it) { concurrentHashSet() }
+                collection.add(account.id)
             }
             account.sname?.let {
-                val collection = snameIndex.computeIfAbsent(it) { LinkedHashSet() }
-                synchronized(collection) {
-                    collection.add(account.id)
-                }
+                val collection = snameIndex.computeIfAbsent(it) { concurrentHashSet() }
+                collection.add(account.id)
             }
             account.email.let { email ->
                 val domain = email.split("@").let { parsedEmail -> parsedEmail[parsedEmail.size - 1] }
-                val domainCollection = emailDomainIndex.computeIfAbsent(domain) { LinkedHashSet() }
-                synchronized(domainCollection) {
-                    domainCollection.add(account.id)
-                }
+                val domainCollection = emailDomainIndex.computeIfAbsent(domain) { concurrentHashSet() }
+                domainCollection.add(account.id)
 
                 emailComparingIndex.put(email, account.id)
             }
             account.phone?.let { phone ->
                 val code = parsePhoneCode(phone)
-                val codeCollection = phoneCodeIndex.computeIfAbsent(code) { LinkedHashSet() }
-                synchronized(codeCollection) {
-                    codeCollection.add(account.id)
-                }
+                val codeCollection = phoneCodeIndex.computeIfAbsent(code) { concurrentHashSet() }
+                codeCollection.add(account.id)
+
             }
             account.country?.let {
-                val collection = countryIndex.computeIfAbsent(it) { LinkedHashSet() }
-                synchronized(collection) {
-                    collection.add(account.id)
-                }
+                val collection = countryIndex.computeIfAbsent(it) { concurrentHashSet() }
+                collection.add(account.id)
             }
             account.city?.let {
-                val collection = cityIndex.computeIfAbsent(it) { LinkedHashSet() }
-                synchronized(collection) {
-                    collection.add(account.id)
-                }
+                val collection = cityIndex.computeIfAbsent(it) { concurrentHashSet() }
+                collection.add(account.id)
             }
             account.birth.let { birthIndex.put(it, account.id) }
 
             (account.interests ?: emptyList()).forEach {
-                val collection = interestIndex.computeIfAbsent(it) { LinkedHashSet() }
-                synchronized(collection) {
-                    collection.add(account.id)
-                }
+                val collection = interestIndex.computeIfAbsent(it) { concurrentHashSet() }
+                collection.add(account.id)
             }
             (account.likes ?: emptyList()).forEach { (likeId, _) ->
-                val collection = likeIndex.computeIfAbsent(likeId) { LinkedHashSet() }
-                synchronized(collection) {
-                    collection.add(account.id)
-                }
+                val collection = likeIndex.computeIfAbsent(likeId) { concurrentHashSet() }
+                collection.add(account.id)
             }
 
             account.premium?.let { (start, finish) ->
@@ -111,8 +97,8 @@ class AccountRepositoryImpl : AccountRepository {
 
         val filteredByEmail = filterRequest.email?.let { (domain, lt, gt) ->
             val filteredByDomain = if (domain != null) emailDomainIndex[domain] ?: emptyList() else ids
-            val filteredByLt = if (lt != null) emailComparingIndex.headMap(lt).values else ids
-            val filteredByGt = if (gt != null) emailComparingIndex.tailMap(gt).values else ids
+            val filteredByLt = if (lt != null) emailComparingIndex.tailMap(lt).values else ids
+            val filteredByGt = if (gt != null) emailComparingIndex.headMap(gt).values else ids
             filteredByDomain.intersect(filteredByLt).intersect(filteredByGt)
         } ?: ids
 
@@ -148,11 +134,11 @@ class AccountRepositoryImpl : AccountRepository {
         } ?: ids
 
         val filteredByBirth = filterRequest.birth?.let { (lt, gt, year) ->
-            val filteredByLt = if (lt != null) birthIndex.headMap(lt).values else ids
-            val filteredByGt = if (gt != null) birthIndex.tailMap(lt).values else ids
+            val filteredByLt = if (lt != null) birthIndex.tailMap(lt).values else ids
+            val filteredByGt = if (gt != null) birthIndex.headMap(gt).values else ids
             val filteredByYear = if (year != null) {
-                val from = LocalDateTime.of(year, 0, 0, 0, 0).toEpochSecond(ZoneOffset.UTC)
-                val to = LocalDateTime.of(year + 1, 0, 0, 0, 0).toEpochSecond(ZoneOffset.UTC) - 1
+                val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC)
+                val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC) - 1
                 birthIndex.tailMap(from).headMap(to).values
             } else ids
             filteredByLt.intersect(filteredByGt).intersect(filteredByYear)
@@ -196,6 +182,7 @@ class AccountRepositoryImpl : AccountRepository {
         } ?: firstResult
 
         return filteredByPremium
+            .sortedDescending()
             .asSequence()
             .map { accounts[it]!! }
             .filter { if (filterRequest.sex != null) it.sex == filterRequest.sex.eq else true }
