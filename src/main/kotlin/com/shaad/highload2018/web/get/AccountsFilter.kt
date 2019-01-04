@@ -19,7 +19,7 @@ class AccountsFilter @Inject constructor(val repository: AccountRepository) : Ha
     override fun process(buf: Buf, pathRange: BufRange, paramsRange: BufRange, bodyRange: BufRange): ByteArray {
         val params = parseParams(buf, paramsRange)
 
-        var limit = 0L
+        var limit = 0
         var sexEq: Char? = null
         var emailDomain: String? = null
         var emailGt: String? = null
@@ -60,7 +60,7 @@ class AccountsFilter @Inject constructor(val repository: AccountRepository) : Ha
 
         params.forEach { (param, value) ->
             when (param) {
-                "limit" -> limit = value.toLong()
+                "limit" -> limit = value.toInt()
                 "sex_eq" -> sexEq = value[0]
 
                 "email_domain" -> emailDomain = value
@@ -175,68 +175,68 @@ class AccountsFilter @Inject constructor(val repository: AccountRepository) : Ha
         }
 }
 
-class SexRequest(val eq: Char)
-class EmailRequest(
+data class SexRequest(val eq: Char)
+data class EmailRequest(
     val domain: String?,
     val lt: String?,
     val gt: String?
 )
 
-class StatusRequest(
+data class StatusRequest(
     val eq: String?,
     val neq: String?
 )
 
-class FnameRequest(
+data class FnameRequest(
     val eq: String?,
     val any: List<String>?,
     val nill: Boolean?
 )
 
-class SnameRequest(
+data class SnameRequest(
     val eq: String?,
     val starts: String?,
     val nill: Boolean?
 )
 
-class PhoneRequest(
+data class PhoneRequest(
     val code: String?,
     val nill: Boolean?
 )
 
-class CountryRequest(
+data class CountryRequest(
     val eq: String?,
     val nill: Boolean?
 )
 
-class CityRequest(
+data class CityRequest(
     val eq: String?,
     val any: List<String>?,
     val nill: Boolean?
 )
 
-class BirthRequest(
+data class BirthRequest(
     val lt: Long?,
     val gt: Long?,
     val year: Int?
 )
 
-class InterestsRequest(
+data class InterestsRequest(
     val contains: List<String>?,
     val any: List<String>?
 )
 
-class LikesRequest(
+data class LikesRequest(
     val contains: List<Int>?
 )
 
-class PremiumRequest(
+data class PremiumRequest(
     val now: Boolean?,
     val nill: Boolean?
 )
 
 class FilterRequest(
-    val limit: Long,
+    val limit: Int,
     val sex: SexRequest?,
     val email: EmailRequest?,
     val status: StatusRequest?,
