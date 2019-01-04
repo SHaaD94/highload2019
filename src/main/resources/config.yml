@@ -1,0 +1,11 @@
+jobs:
+  executor:
+    threads: 64
+  scheduler:
+    threads: 16
+
+http:
+  timeout: 2000
+  timeoutResolution: 2000
+  maxPipeline: 16
+  serverName: ShaadServer

@@ -21,17 +21,22 @@ class AccountRepositoryImpl : AccountRepository {
     private val accounts = ConcurrentHashMap<Int, Account>(10000)
 
     private val fnameIndex = ConcurrentHashMap<String, MutableSet<Int>>()
+    private val fnameNullIndex = concurrentHashSet<Int>()
 
     private val snameIndex = ConcurrentHashMap<String, MutableSet<Int>>()
+    private val snameNullIndex = concurrentHashSet<Int>()
 
     private val emailDomainIndex = ConcurrentHashMap<String, MutableSet<Int>>()
     private val emailComparingIndex = ConcurrentSkipListMap<String, Int>()
 
     private val phoneCodeIndex = ConcurrentHashMap<String, MutableSet<Int>>()
+    private val phoneNullIndex = concurrentHashSet<Int>()
 
     private val countryIndex = ConcurrentHashMap<String, MutableSet<Int>>()
+    private val countryNullIndex = concurrentHashSet<Int>()
 
     private val cityIndex = ConcurrentHashMap<String, MutableSet<Int>>()
+    private val cityNullIndex = concurrentHashSet<Int>()
 
     private val birthIndex = ConcurrentSkipListMap<Long, Int>()
 
@@ -48,10 +53,12 @@ class AccountRepositoryImpl : AccountRepository {
             accounts[account.id] = account
 
             account.fname?.let {
+                fnameNullIndex.add(account.id)
                 val collection = fnameIndex.computeIfAbsent(it) { concurrentHashSet() }
                 collection.add(account.id)
             }
             account.sname?.let {
+                snameNullIndex.add(account.id)
                 val collection = snameIndex.computeIfAbsent(it) { concurrentHashSet() }
                 collection.add(account.id)
             }
@@ -63,16 +70,19 @@ class AccountRepositoryImpl : AccountRepository {
                 emailComparingIndex.put(email, account.id)
             }
             account.phone?.let { phone ->
+                phoneNullIndex.add(account.id)
                 val code = parsePhoneCode(phone)
                 val codeCollection = phoneCodeIndex.computeIfAbsent(code) { concurrentHashSet() }
                 codeCollection.add(account.id)
 
             }
             account.country?.let {
+                countryNullIndex.add(account.id)
                 val collection = countryIndex.computeIfAbsent(it) { concurrentHashSet() }
                 collection.add(account.id)
             }
             account.city?.let {
+                cityNullIndex.add(account.id)
                 val collection = cityIndex.computeIfAbsent(it) { concurrentHashSet() }
                 collection.add(account.id)
             }
@@ -112,30 +122,30 @@ class AccountRepositoryImpl : AccountRepository {
             val filteredByAny = if (any != null) any.flatMap { fnameIndex[eq] ?: emptyList<Int>() } else ids
 
             val result = customIntersects(ids, filteredByEq, filteredByAny)
-            filterByNull(nill, fnameIndex, result)
+            filterByNull(nill, fnameNullIndex, result)
         } ?: ids
 
         val filteredBySname = filterRequest.sname?.let { (eq, _, nill) ->
             val filteredByEq = if (eq != null) snameIndex[eq] ?: emptyList() else ids
-            filterByNull(nill, snameIndex, filteredByEq)
+            filterByNull(nill, snameNullIndex, filteredByEq)
         } ?: ids
 
         val filteredByPhone = filterRequest.phone?.let { (eq, nill) ->
             val filteredByEq = if (eq != null) phoneCodeIndex[eq] ?: emptyList() else ids
-            filterByNull(nill, phoneCodeIndex, filteredByEq)
+            filterByNull(nill, phoneNullIndex, filteredByEq)
         } ?: ids
 
         val filteredByCountry = filterRequest.country?.let { (eq, nill) ->
             val filteredByEq = if (eq != null) countryIndex[eq] ?: emptyList() else ids
-            filterByNull(nill, countryIndex, filteredByEq)
+            filterByNull(nill, countryNullIndex, filteredByEq)
         } ?: ids
 
         val filteredByCity = filterRequest.city?.let { (eq, any, nill) ->
             val filteredByEq = if (eq != null) cityIndex[eq] ?: emptyList() else ids
-            val filteredByAny = if (any != null) any.flatMap { cityIndex[eq] ?: emptyList<Int>() } else ids
+            val filteredByAny = if (any != null) any.flatMap { cityIndex[it] ?: emptyList<Int>() } else ids
 
             val result = customIntersects(ids, filteredByEq, filteredByAny)
-            filterByNull(nill, cityIndex, result)
+            filterByNull(nill, cityNullIndex, result)
         } ?: ids
 
         val filteredByBirth = filterRequest.birth?.let { (lt, gt, year) ->
@@ -186,7 +196,6 @@ class AccountRepositoryImpl : AccountRepository {
         val filteredByPremium = filterRequest.premium?.let { (now, nill) ->
             val filteredByNow = if (now != null) firstResult.filter { premiumIndex[it] == true } else firstResult
             if (nill != null) {
-                //todo probably build in init block
                 when (nill) {
                     true -> filteredByNow.filter { premiumIndex.containsKey(it) }
                     false -> filteredByNow.filter { !premiumIndex.containsKey(it) }
@@ -211,20 +220,13 @@ class AccountRepositoryImpl : AccountRepository {
             .toList()
     }
 
-    private fun filterByNull(
-        nill: Boolean?,
-        index: Map<out Any, Collection<Int>>,
-        collectionToFilter: Collection<Int>
-    ): Collection<Int> {
-        return if (nill != null) {
-            //todo probably build in init block
-            val allIdsWithName = index.flatMap { it.value }.toSet()
+    private fun filterByNull(nill: Boolean?, index: Set<Int>, collectionToFilter: Collection<Int>) =
+        if (nill != null) {
             when (nill) {
-                true -> collectionToFilter.filter { allIdsWithName.contains(it) }
-                false -> collectionToFilter.filter { !allIdsWithName.contains(it) }
+                true -> collectionToFilter.filter { index.contains(it) }
+                false -> collectionToFilter.filter { !index.contains(it) }
             }
         } else collectionToFilter
-    }
 
     private fun withLockById(id: Int, block: () -> Unit) = synchronized(id.toString().intern()) { block() }
 }

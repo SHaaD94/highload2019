@@ -140,11 +140,11 @@ class AccountsFilter @Inject constructor(val repository: AccountRepository) : Ha
         else null
 
         val birthRequest = if (birthGt != null || birthLt != null || birthYear != null)
-            BirthRequest(birthLt, birthLt, birthYear)
+            BirthRequest(birthLt, birthGt, birthYear)
         else null
 
         val interestsRequest = if (interestsAny != null || interestsContains != null)
-            InterestsRequest(interestsAny?.split(","), interestsContains?.split(","))
+            InterestsRequest(interestsContains?.split(","), interestsAny?.split(","))
         else null
 
         val likesRequest = if (likesContains != null)
@@ -152,7 +152,7 @@ class AccountsFilter @Inject constructor(val repository: AccountRepository) : Ha
         else null
 
         val premiumRequest = if (premiumNow != null || premiumNull != null)
-            PremiumRequest(null, parseNull(premiumNull))
+            PremiumRequest(parseNull(premiumNow), parseNull(premiumNull))
         else null
 
         val filterRequest = FilterRequest(
