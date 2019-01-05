@@ -6,19 +6,28 @@ import com.shaad.highload2018.utils.customIntersects
 import com.shaad.highload2018.utils.now
 import com.shaad.highload2018.utils.parsePhoneCode
 import com.shaad.highload2018.web.get.FilterRequest
+import com.shaad.highload2018.web.get.Group
+import com.shaad.highload2018.web.get.GroupRequest
 import java.time.LocalDateTime
 import java.time.ZoneOffset
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentSkipListMap
+import kotlin.collections.HashMap
 
 interface AccountRepository {
     fun addAccount(account: Account)
     fun filter(filterRequest: FilterRequest): List<Account>
+    fun group(groupRequest: GroupRequest): List<Group>
 }
 //todo prefix tree for sname
 
 class AccountRepositoryImpl : AccountRepository {
     private val accounts = ConcurrentHashMap<Int, Account>(10000)
+
+    private val statusIndex = ConcurrentHashMap<String, MutableSet<Int>>()
+
+    private val sexIndex = ConcurrentHashMap<Char, MutableSet<Int>>()
 
     private val fnameIndex = ConcurrentHashMap<String, MutableSet<Int>>()
     private val fnameNullIndex = concurrentHashSet<Int>()
@@ -40,17 +49,22 @@ class AccountRepositoryImpl : AccountRepository {
 
     private val birthIndex = ConcurrentSkipListMap<Long, Int>()
 
+    private val joinedIndex = ConcurrentSkipListMap<Long, Int>()
+
     private val interestIndex = ConcurrentHashMap<String, MutableSet<Int>>()
 
     private val likeIndex = ConcurrentHashMap<Int, MutableSet<Int>>()
 
     private val premiumIndex = ConcurrentHashMap<Int, Boolean>()
 
-
     override fun addAccount(account: Account) {
         withLockById(account.id) {
             check(accounts[account.id] == null) { "User ${account.id} already exists" }
             accounts[account.id] = account
+
+            sexIndex.computeIfAbsent(account.sex) { concurrentHashSet() }.add(account.id)
+
+            statusIndex.computeIfAbsent(account.status) { concurrentHashSet() }.add(account.id)
 
             account.fname?.let {
                 fnameNullIndex.add(account.id)
@@ -87,6 +101,7 @@ class AccountRepositoryImpl : AccountRepository {
                 collection.add(account.id)
             }
             account.birth.let { birthIndex.put(it, account.id) }
+            account.joined.let { joinedIndex.put(it, account.id) }
 
             (account.interests ?: emptyList()).forEach {
                 val collection = interestIndex.computeIfAbsent(it) { concurrentHashSet() }
@@ -156,11 +171,7 @@ class AccountRepositoryImpl : AccountRepository {
                 else -> null
             }?.values ?: ids
 
-            val filteredByYear = if (year != null) {
-                val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC)
-                val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC) - 1
-                birthIndex.tailMap(from).headMap(to).values
-            } else ids
+            val filteredByYear = if (year != null) queryByYear(year, birthIndex) else ids
             customIntersects(ids, filteredByBorders, filteredByYear)
         } ?: ids
 
@@ -206,18 +217,118 @@ class AccountRepositoryImpl : AccountRepository {
         return filteredByPremium
             .sortedDescending()
             .asSequence()
-            .map { accounts[it]!! }
-            .filter { if (filterRequest.sex != null) it.sex == filterRequest.sex.eq else true }
-            .filter {
-                if (filterRequest.status != null) {
-                    val eq = if (filterRequest.status.eq != null) it.status == filterRequest.status.eq else true
-                    val neq = if (filterRequest.status.neq != null) it.status != filterRequest.status.neq else true
-                    neq && eq
-                } else true
+            .filter { id -> if (filterRequest.sex != null) sexIndex[filterRequest.sex.eq]!!.contains(id) else true }
+            .filter { id ->
+                filterRequest.status?.let { (eq, neq) ->
+                    val eqDecision = eq?.let { statusIndex[it]!!.contains(id) } ?: true
+                    val neqDecision = neq?.let { !statusIndex[it]!!.contains(id) } ?: true
+                    neqDecision && eqDecision
+                } ?: true
             }
+            .map { accounts[it]!! }
             .filter { if (filterRequest.sname?.starts != null) it.sname != null && it.sname.startsWith(filterRequest.sname.starts) else true }
             .take(filterRequest.limit)
             .toList()
+    }
+
+    private val emptyInterestsList = listOf(null)
+    override fun group(groupRequest: GroupRequest): List<Group> {
+        val ids = accounts.keys().toList()
+        val filteredIds = customIntersects(ids,
+            groupRequest.sname?.let { snameIndex[it] ?: emptySet<Int>() } ?: ids,
+            groupRequest.fname?.let { fnameIndex[it] ?: emptySet<Int>() } ?: ids,
+            //groupRequest.phone?.let {  }
+            groupRequest.sex?.let { sexIndex[it] ?: emptySet<Int>() } ?: ids,
+            groupRequest.birthYear?.let { queryByYear(it, birthIndex) } ?: ids,
+            groupRequest.joinedYear?.let { queryByYear(it, joinedIndex) } ?: ids,
+            groupRequest.country?.let { countryIndex[it] ?: emptySet<Int>() } ?: ids,
+            groupRequest.city?.let { cityIndex[it] ?: emptySet<Int>() } ?: ids,
+            groupRequest.status?.let { statusIndex[it] ?: emptySet<Int>() } ?: ids,
+            groupRequest.interests?.let { interestIndex[it] ?: emptySet<Int>() } ?: ids,
+            groupRequest.likes?.let { likeIndex[it] ?: emptySet<Int>() } ?: ids
+        )
+
+        val groups = HashMap<String, Int>(filteredIds.size)
+        filteredIds
+            .asSequence()
+            .map { accounts[it]!! }
+            .forEach { acc ->
+                val keyWoInterests = StringJoiner("|")
+
+                when {
+                    groupRequest.keys.contains("sex") -> keyWoInterests.add(acc.sex.toString())
+                    groupRequest.keys.contains("status") -> keyWoInterests.add(acc.status)
+                    groupRequest.keys.contains("country") -> keyWoInterests.add(acc.country)
+                    groupRequest.keys.contains("city") -> keyWoInterests.add(acc.city)
+                }
+                val resultKeyWoInterests = keyWoInterests.toString()
+                if (groupRequest.keys.contains("interests")) {
+                    (acc.interests ?: emptyInterestsList).forEach {
+                        val resultKey =
+                            if (resultKeyWoInterests.isEmpty()) it.toString() else "$resultKeyWoInterests|$it"
+                        groups[resultKey] = (groups[resultKey] ?: 0) + 1
+                    }
+                } else {
+                    groups[resultKeyWoInterests] = (groups[resultKeyWoInterests] ?: 0) + 1
+                }
+            }
+        return groups.entries.let {
+            when {
+                groupRequest.order > 0 -> it.sortedBy { it.component2() }
+                else -> it.sortedByDescending { it.component2() }
+            }
+        }
+            .take(groupRequest.limit)
+            .map { (key, count) ->
+                val splitKey = key.split("|")
+                var keyCounter = 0
+
+                var sexChecked = false
+                var statusChecked = false
+                var countryChecked = false
+                var cityChecked = false
+                var interestsChecked = false
+
+                var sex: Char? = null
+                var status: String? = null
+                var country: String? = null
+                var city: String? = null
+                var interests: String? = null
+                while (keyCounter < splitKey.size) {
+                    when {
+                        groupRequest.keys.contains("sex") && !sexChecked -> {
+                            sex = nullToString(splitKey[keyCounter])?.get(0)
+                            sexChecked = true
+                        }
+                        groupRequest.keys.contains("status") && !statusChecked -> {
+                            status = nullToString(splitKey[keyCounter])
+                            statusChecked = true
+                        }
+                        groupRequest.keys.contains("country") && !countryChecked -> {
+                            country = nullToString(splitKey[keyCounter])
+                            countryChecked = true
+                        }
+                        groupRequest.keys.contains("city") && !cityChecked -> {
+                            city = nullToString(splitKey[keyCounter])
+                            cityChecked = true
+                        }
+                        groupRequest.keys.contains("interests") && !interestsChecked -> {
+                            interests = nullToString(splitKey[keyCounter])
+                            interestsChecked = true
+                        }
+                    }
+                    keyCounter++
+                }
+                Group(count, sex, status, interests, country, city)
+            }
+    }
+
+    fun nullToString(s: String) = if (s == "null") null else s
+
+    private fun queryByYear(year: Int, index: NavigableMap<Long, Int>): Collection<Int> {
+        val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC)
+        val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC) - 1
+        return index.tailMap(from).headMap(to).values
     }
 
     private fun filterByNull(nill: Boolean?, index: Set<Int>, collectionToFilter: Collection<Int>) =
