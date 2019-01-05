@@ -12,10 +12,6 @@ import org.rapidoid.http.HttpVerb
 class AccountsFilter @Inject constructor(val repository: AccountRepository) : HandlerBase() {
     private val path = "/accounts/filter/".toByteArray()
 
-    init {
-        objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL)
-    }
-
     override fun method(): HttpVerb = HttpVerb.GET
 
     override fun matches(buf: Buf, pathRange: BufRange): Boolean =

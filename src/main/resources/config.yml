@@ -1,8 +1,8 @@
 jobs:
   executor:
-    threads: 64
+    threads: 32
   scheduler:
-    threads: 16
+    threads: 2
 
 http:
   timeout: 2000

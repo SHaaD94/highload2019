@@ -1,5 +1,6 @@
 package com.shaad.highload2018.web
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.rapidoid.buffer.Buf
 import org.rapidoid.data.BufRange
@@ -14,6 +15,10 @@ interface Handler {
 
 abstract class HandlerBase : Handler {
     protected val objectMapper = jacksonObjectMapper()
+
+    init {
+        objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL)
+    }
 
     protected fun parseParams(buf: Buf, paramsRange: BufRange): Map<String, String> {
         return buf[paramsRange]

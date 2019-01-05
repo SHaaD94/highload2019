@@ -23,6 +23,7 @@ interface AccountRepository {
 //todo prefix tree for sname
 
 class AccountRepositoryImpl : AccountRepository {
+    private val ids = concurrentHashSet<Int>()
     private val accounts = ConcurrentHashMap<Int, Account>(10000)
 
     private val statusIndex = ConcurrentHashMap<String, MutableSet<Int>>()
@@ -61,6 +62,7 @@ class AccountRepositoryImpl : AccountRepository {
         withLockById(account.id) {
             check(accounts[account.id] == null) { "User ${account.id} already exists" }
             accounts[account.id] = account
+            ids.add(account.id)
 
             sexIndex.computeIfAbsent(account.sex) { concurrentHashSet() }.add(account.id)
 
@@ -119,10 +121,8 @@ class AccountRepositoryImpl : AccountRepository {
     }
 
     override fun filter(filterRequest: FilterRequest): List<Account> {
-        val ids: Collection<Int> = accounts.keys().toList()
-
         val filteredByEmail = filterRequest.email?.let { (domain, lt, gt) ->
-            val filteredByDomain = if (domain != null) emailDomainIndex[domain] ?: emptyList() else ids
+            val filteredByDomain = if (domain != null) emailDomainIndex[domain] ?: emptySet<Int>() else ids
             val filteredByBorders = when {
                 lt != null && gt != null -> emailComparingIndex.subMap(lt, gt)
                 lt != null -> emailComparingIndex.headMap(lt)
@@ -133,7 +133,7 @@ class AccountRepositoryImpl : AccountRepository {
         } ?: ids
 
         val filteredByFname = filterRequest.fname?.let { (eq, any, nill) ->
-            val filteredByEq = if (eq != null) fnameIndex[eq] ?: emptyList() else ids
+            val filteredByEq = if (eq != null) fnameIndex[eq] ?: emptySet<Int>() else ids
             val filteredByAny = if (any != null) any.flatMap { fnameIndex[eq] ?: emptyList<Int>() } else ids
 
             val result = customIntersects(ids, filteredByEq, filteredByAny)
@@ -141,22 +141,22 @@ class AccountRepositoryImpl : AccountRepository {
         } ?: ids
 
         val filteredBySname = filterRequest.sname?.let { (eq, _, nill) ->
-            val filteredByEq = if (eq != null) snameIndex[eq] ?: emptyList() else ids
+            val filteredByEq = if (eq != null) snameIndex[eq] ?: emptySet<Int>() else ids
             filterByNull(nill, snameNullIndex, filteredByEq)
         } ?: ids
 
         val filteredByPhone = filterRequest.phone?.let { (eq, nill) ->
-            val filteredByEq = if (eq != null) phoneCodeIndex[eq] ?: emptyList() else ids
+            val filteredByEq = if (eq != null) phoneCodeIndex[eq] ?: emptySet<Int>() else ids
             filterByNull(nill, phoneNullIndex, filteredByEq)
         } ?: ids
 
         val filteredByCountry = filterRequest.country?.let { (eq, nill) ->
-            val filteredByEq = if (eq != null) countryIndex[eq] ?: emptyList() else ids
+            val filteredByEq = if (eq != null) countryIndex[eq] ?: emptySet<Int>() else ids
             filterByNull(nill, countryNullIndex, filteredByEq)
         } ?: ids
 
         val filteredByCity = filterRequest.city?.let { (eq, any, nill) ->
-            val filteredByEq = if (eq != null) cityIndex[eq] ?: emptyList() else ids
+            val filteredByEq = if (eq != null) cityIndex[eq] ?: emptySet<Int>() else ids
             val filteredByAny = if (any != null) any.flatMap { cityIndex[it] ?: emptyList<Int>() } else ids
 
             val result = customIntersects(ids, filteredByEq, filteredByAny)
@@ -255,12 +255,11 @@ class AccountRepositoryImpl : AccountRepository {
             .forEach { acc ->
                 val keyWoInterests = StringJoiner("|")
 
-                when {
-                    groupRequest.keys.contains("sex") -> keyWoInterests.add(acc.sex.toString())
-                    groupRequest.keys.contains("status") -> keyWoInterests.add(acc.status)
-                    groupRequest.keys.contains("country") -> keyWoInterests.add(acc.country)
-                    groupRequest.keys.contains("city") -> keyWoInterests.add(acc.city)
-                }
+                if (groupRequest.keys.contains("sex")) keyWoInterests.add(acc.sex.toString())
+                if (groupRequest.keys.contains("status")) keyWoInterests.add(acc.status)
+                if (groupRequest.keys.contains("country")) keyWoInterests.add(acc.country)
+                if (groupRequest.keys.contains("city")) keyWoInterests.add(acc.city)
+
                 val resultKeyWoInterests = keyWoInterests.toString()
                 if (groupRequest.keys.contains("interests")) {
                     (acc.interests ?: emptyInterestsList).forEach {
