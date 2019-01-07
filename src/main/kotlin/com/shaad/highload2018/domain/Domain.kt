@@ -1,7 +1,5 @@
 package com.shaad.highload2018.domain
 
-import com.fasterxml.jackson.annotation.JsonIgnore
-
 data class Account(
     val id: Int,
     // max 100 symbols, unique
