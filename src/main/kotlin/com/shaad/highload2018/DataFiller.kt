@@ -18,14 +18,12 @@ class DataFiller @Inject constructor(private val accountRepository: AccountRepos
         val objectMapper = jacksonObjectMapper()
             .configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true)
 
-        val counter = AtomicInteger()
         ZipFile(dataPath).use { zip ->
             for (file in zip.entries()) {
                 zip.getInputStream(file).use {
                     objectMapper.readValue<Accounts>(it, Accounts::class.java)
                 }.accounts.forEach {
                     accountRepository.addAccount(it)
-                    println("Processed ${counter.incrementAndGet()} accounts")
                 }
             }
         }

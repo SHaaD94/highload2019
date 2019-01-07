@@ -3,7 +3,6 @@ package com.shaad.highload2018.repository
 import com.shaad.highload2018.domain.Account
 import com.shaad.highload2018.domain.InnerAccount
 import com.shaad.highload2018.utils.concurrentHashSet
-import com.shaad.highload2018.utils.customIntersects
 import com.shaad.highload2018.utils.now
 import com.shaad.highload2018.utils.parsePhoneCode
 import com.shaad.highload2018.web.get.FilterRequest
@@ -14,17 +13,25 @@ import java.time.ZoneOffset
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentSkipListMap
+import kotlin.concurrent.fixedRateTimer
 
 interface AccountRepository {
     fun addAccount(account: Account)
     fun filter(filterRequest: FilterRequest): List<MutableMap<String, Any?>>
     fun group(groupRequest: GroupRequest): List<Group> = listOf()
 }
-//todo prefix tree for sname
 
 class AccountRepositoryImpl : AccountRepository {
-    private val accounts = ConcurrentHashMap<Int, InnerAccount>(1_300_000)
-    private val ids = accounts.keys
+    init {
+        fixedRateTimer("", true, 0, 10_000) {
+            ids = accounts.keys().toList().sortedDescending()
+        }
+    }
+
+    private val accounts = ConcurrentHashMap<Int, InnerAccount>()
+
+    @Volatile
+    private var ids = accounts.keys().toList().sortedDescending()
 
     private val statusIndex = ConcurrentHashMap<String, MutableSet<Int>>()
 
@@ -125,105 +132,92 @@ class AccountRepositoryImpl : AccountRepository {
     }
 
     override fun filter(filterRequest: FilterRequest): List<MutableMap<String, Any?>> {
-        val filteredByEmail = filterRequest.email?.let { (domain, lt, gt) ->
-            val filteredByDomain = if (domain != null) emailDomainIndex[domain] ?: emptySet<Int>() else ids
-            val filteredByBorders = when {
+        val filters = mutableListOf<Set<Int>>()
+        filterRequest.email?.let { (domain, lt, gt) ->
+            if (domain != null) filters.add(emailDomainIndex[domain] ?: emptySet())
+            when {
                 lt != null && gt != null -> emailComparingIndex.subMap(lt, gt)
                 lt != null -> emailComparingIndex.headMap(lt)
                 gt != null -> emailComparingIndex.tailMap(gt)
                 else -> null
-            }?.values ?: ids
-            customIntersects(ids, filteredByDomain, filteredByBorders)
-        } ?: ids
+            }?.values?.let { filters.add(it.toSet()) }
+        }
 
-        val filteredByFname = filterRequest.fname?.let { (eq, any, nill) ->
-            val filteredByEq = if (eq != null) fnameIndex[eq] ?: emptySet<Int>() else ids
-            val filteredByAny = if (any != null) any.flatMap { fnameIndex[eq] ?: emptyList<Int>() } else ids
+        filterRequest.fname?.let { (eq, any, _) ->
+            if (eq != null) filters.add(fnameIndex[eq] ?: emptySet())
+            if (any != null) filters.add(any.flatMap { fnameIndex[eq] ?: emptySet<Int>() }.toSet())
+        }
 
-            val result = customIntersects(ids, filteredByEq, filteredByAny)
-            filterByNull(nill, fnameNullIndex, result)
-        } ?: ids
+        filterRequest.sname?.let { (eq, starts, _) ->
+            if (starts != null) {
+                filters.add(snameIndex.filter { it.key.startsWith(starts) }.flatMap { it.value }.toSet())
+            }
+            if (eq != null) filters.add(snameIndex[eq] ?: emptySet())
+        }
 
-        val filteredBySname = filterRequest.sname?.let { (eq, starts, nill) ->
-            val filterByStarts = if (starts != null) {
-                snameIndex.filter { it.key.startsWith(starts) }.flatMap { it.value }
-            } else ids
-            val filteredByEq = if (eq != null) snameIndex[eq] ?: emptySet<Int>() else ids
-            filterByNull(nill, snameNullIndex, customIntersects(ids, filterByStarts, filteredByEq))
-        } ?: ids
+        filterRequest.phone?.let { (eq, _) ->
+            if (eq != null) filters.add(phoneCodeIndex[eq] ?: emptySet())
+        }
 
-        val filteredByPhone = filterRequest.phone?.let { (eq, nill) ->
-            val filteredByEq = if (eq != null) phoneCodeIndex[eq] ?: emptySet<Int>() else ids
-            filterByNull(nill, phoneNullIndex, filteredByEq)
-        } ?: ids
+        filterRequest.country?.let { (eq, _) ->
+            if (eq != null) filters.add(countryIndex[eq] ?: emptySet())
+        }
 
-        val filteredByCountry = filterRequest.country?.let { (eq, nill) ->
-            val filteredByEq = if (eq != null) countryIndex[eq] ?: emptySet<Int>() else ids
-            filterByNull(nill, countryNullIndex, filteredByEq)
-        } ?: ids
+        filterRequest.city?.let { (eq, any, _) ->
+            if (eq != null) filters.add(cityIndex[eq] ?: emptySet())
+            if (any != null) filters.add(any.flatMap { cityIndex[it] ?: emptySet<Int>() }.toSet())
+        }
 
-        val filteredByCity = filterRequest.city?.let { (eq, any, nill) ->
-            val filteredByEq = if (eq != null) cityIndex[eq] ?: emptySet<Int>() else ids
-            val filteredByAny = if (any != null) any.flatMap { cityIndex[it] ?: emptyList<Int>() } else ids
-
-            val result = customIntersects(ids, filteredByEq, filteredByAny)
-            filterByNull(nill, cityNullIndex, result)
-        } ?: ids
-
-        val filteredByBirth = filterRequest.birth?.let { (lt, gt, year) ->
-            val filteredByBorders = when {
+        filterRequest.birth?.let { (lt, gt, year) ->
+            when {
                 lt != null && gt != null -> birthIndex.subMap(lt, gt)
                 lt != null -> birthIndex.headMap(lt)
                 gt != null -> birthIndex.tailMap(gt)
                 else -> null
-            }?.values ?: ids
+            }?.values?.let { filters.add(it.toSet()) }
 
-            val filteredByYear = if (year != null) queryByYear(year, birthIndex) else ids
-            customIntersects(ids, filteredByBorders, filteredByYear)
-        } ?: ids
+            if (year != null) filters.add(queryByYear(year, birthIndex).toSet())
+        }
 
-        val filteredByInterests = filterRequest.interests?.let { (contains, any) ->
-            val filteredByContains = contains?.let { interests ->
+        filterRequest.interests?.let { (contains, any) ->
+            contains?.let { interests ->
                 interests.map { interestIndex[it] ?: emptyList<Int>() }.reduce { l, r -> l.intersect(r) }
-            } ?: ids
-            val filteredByAny = any?.let { interests ->
-                interests.flatMap { interestIndex[it] ?: emptyList<Int>() }.toSet()
-            } ?: ids
-            customIntersects(ids, filteredByContains, filteredByAny)
-        } ?: ids
+            }?.let { filters.add(it.toSet()) }
+            any?.let { interests ->
+                interests.flatMap { interestIndex[it] ?: emptyList<Int>() }
+            }?.let { filters.add(it.toSet()) }
+        }
 
-        val filteredByLikes = filterRequest.likes?.let { (contains) ->
+        filterRequest.likes?.let { (contains) ->
             contains?.let { likes ->
                 likes.map { likeIndex[it] ?: emptyList<Int>() }.reduce { acc, list -> acc.intersect(list) }
-            } ?: ids
-        } ?: ids
+            }?.let { filters.add(it.toSet()) }
+        }
 
-        val firstResult = customIntersects(
-            ids,
-            filteredByEmail,
-            filteredByFname,
-            filteredBySname,
-            filteredByPhone,
-            filteredByCountry,
-            filteredByCity,
-            filteredByBirth,
-            filteredByInterests,
-            filteredByLikes
-        )
-
-        val filteredByPremium = filterRequest.premium?.let { (now, nill) ->
-            val filteredByNow = if (now != null) firstResult.filter { premiumIndex[it] == true } else firstResult
-            if (nill != null) {
-                when (nill) {
-                    true -> filteredByNow.filter { premiumIndex.containsKey(it) }
-                    false -> filteredByNow.filter { !premiumIndex.containsKey(it) }
-                }
-            } else filteredByNow
-        } ?: firstResult
-
-        return filteredByPremium
-            .sortedDescending()
+        return ids
             .asSequence()
+            .filter { id ->
+                filters.all { it == ids || it.contains(id) }
+            }
+            .filter { id ->
+                filterByNull(filterRequest.fname?.nill, fnameNullIndex, id) &&
+                        filterByNull(filterRequest.sname?.nill, snameNullIndex, id) &&
+                        filterByNull(filterRequest.phone?.nill, phoneNullIndex, id) &&
+                        filterByNull(filterRequest.country?.nill, countryNullIndex, id) &&
+                        filterByNull(filterRequest.city?.nill, cityNullIndex, id)
+            }
+            .filter { id ->
+                filterRequest.premium?.let { (now, nill) ->
+                    val filterByNow = if (now != null) premiumIndex[id] == true else true
+                    val filterByNill = if (nill != null) {
+                        when (nill) {
+                            true -> premiumIndex.containsKey(id)
+                            false -> !premiumIndex.containsKey(id)
+                        }
+                    } else true
+                    filterByNill && filterByNow
+                } ?: true
+            }
             .filter { id -> if (filterRequest.sex != null) sexIndex[filterRequest.sex.eq]!!.contains(id) else true }
             .filter { id ->
                 filterRequest.status?.let { (eq, neq) ->
@@ -236,6 +230,7 @@ class AccountRepositoryImpl : AccountRepository {
             .map { id ->
                 val innerAccount = accounts[id]!!
                 val resultObj = mutableMapOf<String, Any?>("id" to id, "email" to innerAccount.email)
+
                 filterRequest.sex?.let { resultObj["sex"] = filterRequest.sex.eq }
                 filterRequest.status?.let {
                     resultObj["status"] = statusIndex.entries.first { it.value.contains(id) }.key
@@ -255,6 +250,7 @@ class AccountRepositoryImpl : AccountRepository {
                 }
                 filterRequest.birth?.let { resultObj["birth"] = innerAccount.birth }
                 filterRequest.premium?.let { resultObj["premium"] = innerAccount.premium }
+
                 resultObj
             }
             .toList()
@@ -363,13 +359,13 @@ class AccountRepositoryImpl : AccountRepository {
         return index.subMap(from, to).flatMap { it.value }
     }
 
-    private fun filterByNull(nill: Boolean?, index: Set<Int>, collectionToFilter: Collection<Int>) =
+    private fun filterByNull(nill: Boolean?, index: Set<Int>, id: Int) =
         if (nill != null) {
             when (nill) {
-                true -> collectionToFilter.filter { !index.contains(it) }
-                false -> collectionToFilter.filter { index.contains(it) }
+                true -> !index.contains(id)
+                false -> index.contains(id)
             }
-        } else collectionToFilter
+        } else true
 
     private fun withLockById(id: Int, block: () -> Unit) = synchronized(id.toString().intern()) { block() }
 }

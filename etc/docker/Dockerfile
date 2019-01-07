@@ -6,8 +6,8 @@ CMD ["java", \
 \
      "-XX:+UseG1GC",\
 \
-     "-XX:+PrintGCDetails",\
-     "-XX:+PrintGCApplicationStoppedTime",\
+#     "-XX:+PrintGCDetails",\
+#     "-XX:+PrintGCApplicationStoppedTime",\
 \
      "-Djava.lang.Integer.IntegerCache.high=1300000",\
      "-XX:ParallelGCThreads=8",\
