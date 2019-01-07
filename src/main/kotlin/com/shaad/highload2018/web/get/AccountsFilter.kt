@@ -163,19 +163,7 @@ class AccountsFilter @Inject constructor(val repository: AccountRepository) : Ha
             countryRequest, cityRequest, birthRequest, interestsRequest, likesRequest, premiumRequest
         )
 
-        val response = mapOf("accounts" to repository.filter(filterRequest).map { acc ->
-            val resultObj = mutableMapOf<String, Any?>("id" to acc.id, "email" to acc.email)
-            sexRequest?.let { resultObj["sex"] = acc.sex }
-            statusRequest?.let { resultObj["status"] = acc.status }
-            fnameRequest?.let { resultObj["fname"] = acc.fname }
-            snameRequest?.let { resultObj["sname"] = acc.sname }
-            phoneRequest?.let { resultObj["phone"] = acc.phone }
-            countryRequest?.let { resultObj["country"] = acc.country }
-            cityRequest?.let { resultObj["city"] = acc.city }
-            birthRequest?.let { resultObj["birth"] = acc.birth }
-            premiumRequest?.let { resultObj["premium"] = acc.premium }
-            resultObj
-        })
+        val response = mapOf("accounts" to repository.filter(filterRequest))
 
         return objectMapper.writeValueAsBytes(response)
     }

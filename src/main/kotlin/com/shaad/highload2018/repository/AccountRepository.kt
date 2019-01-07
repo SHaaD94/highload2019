@@ -1,7 +1,7 @@
 package com.shaad.highload2018.repository
 
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.shaad.highload2018.domain.Account
+import com.shaad.highload2018.domain.InnerAccount
 import com.shaad.highload2018.utils.concurrentHashSet
 import com.shaad.highload2018.utils.customIntersects
 import com.shaad.highload2018.utils.now
@@ -9,7 +9,6 @@ import com.shaad.highload2018.utils.parsePhoneCode
 import com.shaad.highload2018.web.get.FilterRequest
 import com.shaad.highload2018.web.get.Group
 import com.shaad.highload2018.web.get.GroupRequest
-import java.io.File
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.*
@@ -18,17 +17,14 @@ import java.util.concurrent.ConcurrentSkipListMap
 
 interface AccountRepository {
     fun addAccount(account: Account)
-    fun filter(filterRequest: FilterRequest): List<Account>
+    fun filter(filterRequest: FilterRequest): List<MutableMap<String, Any?>>
     fun group(groupRequest: GroupRequest): List<Group> = listOf()
 }
 //todo prefix tree for sname
 
 class AccountRepositoryImpl : AccountRepository {
-    private val objectMapper = jacksonObjectMapper()
-    private val tempDir = System.getProperty("java.io.tmpdir")
-
-    private val ids = concurrentHashSet<Int>(1_300_000)
-//    private val accounts = ConcurrentHashMap<Int, Account>(1_300_000)
+    private val accounts = ConcurrentHashMap<Int, InnerAccount>(1_300_000)
+    private val ids = accounts.keys
 
     private val statusIndex = ConcurrentHashMap<String, MutableSet<Int>>()
 
@@ -62,15 +58,10 @@ class AccountRepositoryImpl : AccountRepository {
 
     private val premiumIndex = ConcurrentHashMap<Int, Boolean>()
 
-    init {
-        println("Initializing temp dir in $tempDir")
-    }
-
     override fun addAccount(account: Account) {
         withLockById(account.id) {
-            check(!ids.contains(account.id)) { "User ${account.id} already exists" }
-            saveToDisk(account)
-            ids.add(account.id)
+            check(!accounts.containsKey(account.id)) { "User ${account.id} already exists" }
+            accounts[account.id] = InnerAccount(account.email, account.birth, account.phone, account.premium)
 
             sexIndex.computeIfAbsent(account.sex) { concurrentHashSet(600_000) }.add(account.id)
 
@@ -119,6 +110,7 @@ class AccountRepositoryImpl : AccountRepository {
                 val collection = interestIndex.computeIfAbsent(it) { concurrentHashSet(15_000) }
                 collection.add(account.id)
             }
+
             (account.likes ?: emptyList()).forEach { (likeId, _) ->
                 val collection = likeIndex.computeIfAbsent(likeId) { mutableListOf() }
                 synchronized(collection) {
@@ -132,7 +124,7 @@ class AccountRepositoryImpl : AccountRepository {
         }
     }
 
-    override fun filter(filterRequest: FilterRequest): List<Account> {
+    override fun filter(filterRequest: FilterRequest): List<MutableMap<String, Any?>> {
         val filteredByEmail = filterRequest.email?.let { (domain, lt, gt) ->
             val filteredByDomain = if (domain != null) emailDomainIndex[domain] ?: emptySet<Int>() else ids
             val filteredByBorders = when {
@@ -240,9 +232,31 @@ class AccountRepositoryImpl : AccountRepository {
                     neqDecision && eqDecision
                 } ?: true
             }
-
             .take(filterRequest.limit)
-            .map { readFromDisk(it) }
+            .map { id ->
+                val innerAccount = accounts[id]!!
+                val resultObj = mutableMapOf<String, Any?>("id" to id, "email" to innerAccount.email)
+                filterRequest.sex?.let { resultObj["sex"] = filterRequest.sex.eq }
+                filterRequest.status?.let {
+                    resultObj["status"] = statusIndex.entries.first { it.value.contains(id) }.key
+                }
+                filterRequest.fname?.let {
+                    resultObj["fname"] = fnameIndex.entries.firstOrNull { it.value.contains(id) }?.key
+                }
+                filterRequest.sname?.let {
+                    resultObj["sname"] = snameIndex.entries.firstOrNull { it.value.contains(id) }?.key
+                }
+                filterRequest.phone?.let { resultObj["phone"] = innerAccount.phone }
+                filterRequest.country?.let {
+                    resultObj["country"] = countryIndex.entries.firstOrNull { it.value.contains(id) }?.key
+                }
+                filterRequest.city?.let {
+                    resultObj["city"] = cityIndex.entries.firstOrNull { it.value.contains(id) }?.key
+                }
+                filterRequest.birth?.let { resultObj["birth"] = innerAccount.birth }
+                filterRequest.premium?.let { resultObj["premium"] = innerAccount.premium }
+                resultObj
+            }
             .toList()
     }
 
@@ -336,16 +350,6 @@ class AccountRepositoryImpl : AccountRepository {
 //    }
 
     private fun nullToString(s: String) = if (s == "null") null else s
-
-    private fun saveToDisk(account: Account) {
-        val file = File("$tempDir/${account.id}")
-        file.delete()
-        objectMapper.writeValue(file, account)
-        file.deleteOnExit()
-    }
-
-    private fun readFromDisk(id: Int) =
-        objectMapper.readValue(File("$tempDir/$id}"), Account::class.java)
 
     private fun queryByYear(year: Int, index: NavigableMap<Long, Int>): Collection<Int> {
         val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC)

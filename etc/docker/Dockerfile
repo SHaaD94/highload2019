@@ -11,7 +11,6 @@ CMD ["java", \
 \
      "-Djava.lang.Integer.IntegerCache.high=1300000",\
      "-XX:ParallelGCThreads=8",\
-     "-XX:MaxGCPauseMillis=500",\
      "-Xmx1800m",\
      "-Xms1800m",\
 \

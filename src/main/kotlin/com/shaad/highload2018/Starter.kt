@@ -10,7 +10,6 @@ fun main(args: Array<String>) {
         BaseModule()
     )
     injector.getInstance(DataFiller::class.java).fill()
-    Msc.thread { System.gc() }
     injector.getInstance(Server::class.java)
         .listen(80)
 }

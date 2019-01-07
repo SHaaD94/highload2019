@@ -3,7 +3,6 @@ package com.shaad.highload2018.web
 import com.google.inject.Inject
 import org.rapidoid.buffer.Buf
 import org.rapidoid.http.AbstractHttpServer
-import org.rapidoid.http.HttpResponseCodes
 import org.rapidoid.http.HttpStatus
 import org.rapidoid.http.MediaType
 import org.rapidoid.net.abstracts.Channel
@@ -14,7 +13,9 @@ class Server @Inject constructor(handlers: @JvmSuppressWildcards Set<Handler>) :
 
     private val json = MediaType.create("application/json; charset=UTF-8;", "json", "map")
 
-    private val STATUS_400 = HttpResponseCodes.get(400)
+    init {
+        System.gc()
+    }
 
     override fun handle(ctx: Channel, buf: Buf, data: RapidoidHelper): HttpStatus {
         val method = buf.get(data.verb)
