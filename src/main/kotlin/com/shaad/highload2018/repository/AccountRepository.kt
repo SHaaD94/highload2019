@@ -23,8 +23,8 @@ interface AccountRepository {
 //todo prefix tree for sname
 
 class AccountRepositoryImpl : AccountRepository {
-    private val ids = concurrentHashSet<Int>()
-    private val accounts = ConcurrentHashMap<Int, Account>(10000)
+    private val ids = concurrentHashSet<Int>(1_300_000)
+    private val accounts = ConcurrentHashMap<Int, Account>(1_300_000)
 
     private val statusIndex = ConcurrentHashMap<String, MutableSet<Int>>()
 
@@ -50,69 +50,70 @@ class AccountRepositoryImpl : AccountRepository {
 
     private val birthIndex = ConcurrentSkipListMap<Long, Int>()
 
-    private val joinedIndex = ConcurrentSkipListMap<Long, Int>()
+    private val joinedIndex = ConcurrentSkipListMap<Long, MutableSet<Int>>()
 
     private val interestIndex = ConcurrentHashMap<String, MutableSet<Int>>()
 
-    private val likeIndex = ConcurrentHashMap<Int, MutableSet<Int>>()
+    private val likeIndex = ConcurrentHashMap<Int, MutableSet<Int>>(0)
 
     private val premiumIndex = ConcurrentHashMap<Int, Boolean>()
 
     override fun addAccount(account: Account) {
         withLockById(account.id) {
             check(accounts[account.id] == null) { "User ${account.id} already exists" }
-            accounts[account.id] = account
+//            accounts[account.id] = account
             ids.add(account.id)
 
-            sexIndex.computeIfAbsent(account.sex) { concurrentHashSet() }.add(account.id)
+            sexIndex.computeIfAbsent(account.sex) { concurrentHashSet(600_000) }.add(account.id)
 
-            statusIndex.computeIfAbsent(account.status) { concurrentHashSet() }.add(account.id)
+            statusIndex.computeIfAbsent(account.status) { concurrentHashSet(300_000) }.add(account.id)
 
             account.fname?.let {
-                fnameNullIndex.add(account.id)
                 val collection = fnameIndex.computeIfAbsent(it) { concurrentHashSet() }
                 collection.add(account.id)
-            }
+            } ?: fnameNullIndex.add(account.id)
+
             account.sname?.let {
-                snameNullIndex.add(account.id)
                 val collection = snameIndex.computeIfAbsent(it) { concurrentHashSet() }
                 collection.add(account.id)
-            }
+            } ?: snameNullIndex.add(account.id)
+
             account.email.let { email ->
                 val domain = email.split("@").let { parsedEmail -> parsedEmail[parsedEmail.size - 1] }
-                val domainCollection = emailDomainIndex.computeIfAbsent(domain) { concurrentHashSet() }
+                val domainCollection = emailDomainIndex.computeIfAbsent(domain) { concurrentHashSet(100_000) }
                 domainCollection.add(account.id)
 
                 emailComparingIndex.put(email, account.id)
             }
             account.phone?.let { phone ->
-                phoneNullIndex.add(account.id)
                 val code = parsePhoneCode(phone)
                 val codeCollection = phoneCodeIndex.computeIfAbsent(code) { concurrentHashSet() }
                 codeCollection.add(account.id)
+            } ?: phoneNullIndex.add(account.id)
 
-            }
             account.country?.let {
                 countryNullIndex.add(account.id)
                 val collection = countryIndex.computeIfAbsent(it) { concurrentHashSet() }
                 collection.add(account.id)
-            }
+            } ?: countryNullIndex.add(account.id)
+
             account.city?.let {
                 cityNullIndex.add(account.id)
                 val collection = cityIndex.computeIfAbsent(it) { concurrentHashSet() }
                 collection.add(account.id)
-            }
-            account.birth.let { birthIndex.put(it, account.id) }
-            account.joined.let { joinedIndex.put(it, account.id) }
+            } ?: cityNullIndex.add(account.id)
+
+            birthIndex[account.birth] = account.id
+            joinedIndex.computeIfAbsent(account.joined) { concurrentHashSet(200) }.add(account.id)
 
             (account.interests ?: emptyList()).forEach {
-                val collection = interestIndex.computeIfAbsent(it) { concurrentHashSet() }
+                val collection = interestIndex.computeIfAbsent(it) { concurrentHashSet(15_000) }
                 collection.add(account.id)
             }
-            (account.likes ?: emptyList()).forEach { (likeId, _) ->
-                val collection = likeIndex.computeIfAbsent(likeId) { concurrentHashSet() }
-                collection.add(account.id)
-            }
+//            (account.likes ?: emptyList()).forEach { (likeId, _) ->
+//                val collection = likeIndex.computeIfAbsent(likeId) { concurrentHashSet() }
+//                collection.add(account.id)
+//            }
 
             account.premium?.let { (start, finish) ->
                 premiumIndex.computeIfAbsent(account.id) { now() in (start until finish) }
@@ -233,14 +234,12 @@ class AccountRepositoryImpl : AccountRepository {
 
     private val emptyInterestsList = listOf(null)
     override fun group(groupRequest: GroupRequest): List<Group> {
-        val ids = accounts.keys().toList()
         val filteredIds = customIntersects(ids,
             groupRequest.sname?.let { snameIndex[it] ?: emptySet<Int>() } ?: ids,
             groupRequest.fname?.let { fnameIndex[it] ?: emptySet<Int>() } ?: ids,
-            //groupRequest.phone?.let {  }
             groupRequest.sex?.let { sexIndex[it] ?: emptySet<Int>() } ?: ids,
             groupRequest.birthYear?.let { queryByYear(it, birthIndex) } ?: ids,
-            groupRequest.joinedYear?.let { queryByYear(it, joinedIndex) } ?: ids,
+            groupRequest.joinedYear?.let { queryComplexByYear(it, joinedIndex) } ?: ids,
             groupRequest.country?.let { countryIndex[it] ?: emptySet<Int>() } ?: ids,
             groupRequest.city?.let { cityIndex[it] ?: emptySet<Int>() } ?: ids,
             groupRequest.status?.let { statusIndex[it] ?: emptySet<Int>() } ?: ids,
@@ -273,8 +272,8 @@ class AccountRepositoryImpl : AccountRepository {
             }
         return groups.entries.let {
             when {
-                groupRequest.order > 0 -> it.sortedBy { it.component2() }
-                else -> it.sortedByDescending { it.component2() }
+                groupRequest.order > 0 -> it.sortedWith(compareBy({ it.value }, { it.key }))
+                else -> it.sortedWith(compareByDescending<MutableMap.MutableEntry<String, Int>> { it.value }.thenByDescending { it.key })
             }
         }
             .take(groupRequest.limit)
@@ -327,14 +326,20 @@ class AccountRepositoryImpl : AccountRepository {
     private fun queryByYear(year: Int, index: NavigableMap<Long, Int>): Collection<Int> {
         val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC)
         val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC) - 1
-        return index.tailMap(from).headMap(to).values
+        return index.subMap(from, to).values
+    }
+
+    private fun queryComplexByYear(year: Int, index: NavigableMap<Long, MutableSet<Int>>): Collection<Int> {
+        val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC)
+        val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC) - 1
+        return index.subMap(from, to).flatMap { it.value }
     }
 
     private fun filterByNull(nill: Boolean?, index: Set<Int>, collectionToFilter: Collection<Int>) =
         if (nill != null) {
             when (nill) {
-                true -> collectionToFilter.filter { index.contains(it) }
-                false -> collectionToFilter.filter { !index.contains(it) }
+                true -> collectionToFilter.filter { !index.contains(it) }
+                false -> collectionToFilter.filter { index.contains(it) }
             }
         } else collectionToFilter
 

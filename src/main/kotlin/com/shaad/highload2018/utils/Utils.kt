@@ -22,7 +22,7 @@ fun parsePhoneCode(phone: String): String {
     throw RuntimeException("Failed to parse code of phone $phone")
 }
 
-fun <K> concurrentHashSet(): MutableSet<K> = ConcurrentHashMap.newKeySet()
+fun <K> concurrentHashSet(capacity: Int = 16): MutableSet<K> = ConcurrentHashMap.newKeySet(capacity)
 
 fun now() = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
 

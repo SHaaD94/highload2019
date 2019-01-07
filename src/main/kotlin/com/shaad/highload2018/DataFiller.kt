@@ -6,6 +6,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.google.inject.Inject
 import com.shaad.highload2018.domain.Account
 import com.shaad.highload2018.repository.AccountRepository
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.zip.ZipFile
 
 private class Accounts(val accounts: List<Account>)
@@ -17,12 +18,14 @@ class DataFiller @Inject constructor(private val accountRepository: AccountRepos
         val objectMapper = jacksonObjectMapper()
             .configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true)
 
+        val counter = AtomicInteger()
         ZipFile(dataPath).use { zip ->
             for (file in zip.entries()) {
                 zip.getInputStream(file).use {
                     objectMapper.readValue<Accounts>(it, Accounts::class.java)
                 }.accounts.forEach {
                     accountRepository.addAccount(it)
+                    println("Processed ${counter.incrementAndGet()} accounts")
                 }
             }
         }
