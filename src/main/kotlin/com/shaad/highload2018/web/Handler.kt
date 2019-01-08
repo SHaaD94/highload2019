@@ -10,10 +10,12 @@ import org.rapidoid.util.Msc
 interface Handler {
     fun method(): HttpVerb
     fun matches(buf: Buf, pathRange: BufRange): Boolean
-    fun process(buf: Buf, pathRange: BufRange, paramsRange: BufRange, bodyRange: BufRange): ByteArray
+    fun process(buf: Buf, pathRange: BufRange, paramsRange: BufRange, bodyRange: BufRange): HandlerAnswer
 }
 
 abstract class HandlerBase : Handler {
+    protected val emptyResponse = "{}".toByteArray()
+
     protected val objectMapper = jacksonObjectMapper()
 
     init {
@@ -29,3 +31,5 @@ abstract class HandlerBase : Handler {
             .toMap()
     }
 }
+
+class HandlerAnswer(val code: Int, val body: ByteArray)

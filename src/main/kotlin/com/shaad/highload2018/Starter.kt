@@ -17,4 +17,6 @@ fun main(args: Array<String>) {
 
     injector.getInstance(Server::class.java)
         .listen(80)
+
+    System.gc()
 }

@@ -2,6 +2,7 @@ package com.shaad.highload2018.web.get
 
 import com.google.inject.Inject
 import com.shaad.highload2018.repository.AccountRepository
+import com.shaad.highload2018.web.HandlerAnswer
 import com.shaad.highload2018.web.HandlerBase
 import org.rapidoid.buffer.Buf
 import org.rapidoid.bytes.BytesUtil
@@ -15,27 +16,34 @@ class AccountsGroup @Inject constructor(private val accountRepository: AccountRe
     override fun matches(buf: Buf, pathRange: BufRange): Boolean =
         BytesUtil.match(buf.bytes(), pathRange.start, path, true)
 
-    override fun process(buf: Buf, pathRange: BufRange, paramsRange: BufRange, bodyRange: BufRange): ByteArray {
+    override fun process(buf: Buf, pathRange: BufRange, paramsRange: BufRange, bodyRange: BufRange): HandlerAnswer {
         val params = parseParams(buf, paramsRange)
 
-        val request = GroupRequest(
-            params["sname"],
-            params["fname"],
-            /*params["phone"]*/null,
-            params["sex"]?.get(0),
-            params["birth"]?.toInt(),
-            params["country"],
-            params["city"],
-            params["joined"]?.toInt(),
-            params["status"],
-            params["interests"],
-            params["likes"]?.toInt(),
-            params["limit"]!!.toInt(),
-            params["order"]?.toInt() ?: 1,
-            params["keys"]!!.split(",").toHashSet()
-        )
+        val request = try {
+            GroupRequest(
+                params["sname"],
+                params["fname"],
+                /*params["phone"]*/null,
+                params["sex"]?.get(0),
+                params["birth"]?.toInt(),
+                params["country"],
+                params["city"],
+                params["joined"]?.toInt(),
+                params["status"],
+                params["interests"],
+                params["likes"]?.toInt(),
+                params["limit"]!!.toInt(),
+                params["order"]?.toInt() ?: 1,
+                params["keys"]!!.split(",").toHashSet()
+            )
+        } catch (e: Exception) {
+            return HandlerAnswer(400, e.message!!.toByteArray())
+        }
 
-        return objectMapper.writeValueAsBytes(mapOf("groups" to accountRepository.group(request)))
+        return HandlerAnswer(
+            200,
+            objectMapper.writeValueAsBytes(mapOf("groups" to accountRepository.group(request)))
+        )
     }
 }
 

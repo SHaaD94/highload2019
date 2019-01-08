@@ -20,12 +20,19 @@ class Server @Inject constructor(handlers: @JvmSuppressWildcards Set<Handler>) :
             ?.let {
                 kotlin.runCatching { it.process(buf, data.path, data.query, data.body) }
                     .onSuccess {
-                        ok(ctx, true, it, json)
+                        startResponse(ctx, it.code, true)
+                        writeBody(ctx, it.body, 0, it.body.size, json)
                     }
                     .onFailure {
                         it.printStackTrace()
-                        startResponse(ctx, 400, true)
-                        writeBody(ctx, it.message?.toByteArray(), 0, it.message?.toByteArray()?.size ?: 1, json)
+                        startResponse(ctx, 500, true)
+                        writeBody(
+                            ctx,
+                            it.message?.toByteArray() ?: "Internal server error".toByteArray(),
+                            0,
+                            it.message?.toByteArray()?.size ?: 21,
+                            json
+                        )
                     }.getOrNull()
                 HttpStatus.DONE
             }

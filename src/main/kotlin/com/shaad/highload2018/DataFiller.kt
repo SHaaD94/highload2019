@@ -17,7 +17,7 @@ import java.util.zip.ZipFile
 private class Accounts(val accounts: List<Account>)
 
 class DataFiller @Inject constructor(private val accountRepository: AccountRepository) {
-    private val dataPath = "/tmp/data/data.zip"
+    private val dataPath = "/tmp/data1/data.zip"
 
     fun fill() {
         val dispatcher = Executors.newFixedThreadPool(4).asCoroutineDispatcher()

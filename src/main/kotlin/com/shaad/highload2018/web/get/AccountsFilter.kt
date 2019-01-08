@@ -1,8 +1,8 @@
 package com.shaad.highload2018.web.get
 
-import com.fasterxml.jackson.annotation.JsonInclude
 import com.google.inject.Inject
 import com.shaad.highload2018.repository.AccountRepository
+import com.shaad.highload2018.web.HandlerAnswer
 import com.shaad.highload2018.web.HandlerBase
 import org.rapidoid.buffer.Buf
 import org.rapidoid.bytes.BytesUtil
@@ -17,10 +17,21 @@ class AccountsFilter @Inject constructor(val repository: AccountRepository) : Ha
     override fun matches(buf: Buf, pathRange: BufRange): Boolean =
         BytesUtil.match(buf.bytes(), pathRange.start, path, true)
 
-    //todo bad requests
-    override fun process(buf: Buf, pathRange: BufRange, paramsRange: BufRange, bodyRange: BufRange): ByteArray {
+    override fun process(buf: Buf, pathRange: BufRange, paramsRange: BufRange, bodyRange: BufRange): HandlerAnswer {
         val params = parseParams(buf, paramsRange)
 
+        val filterRequest = try {
+            parseFilterRequest(params)
+        } catch (e: Exception) {
+            return HandlerAnswer(400, e.message!!.toByteArray())
+        }
+
+        val response = mapOf("accounts" to repository.filter(filterRequest))
+
+        return HandlerAnswer(200, objectMapper.writeValueAsBytes(response))
+    }
+
+    private fun parseFilterRequest(params: Map<String, String>): FilterRequest {
         var limit = -1
         var sexEq: Char? = null
         var emailDomain: String? = null
@@ -162,10 +173,7 @@ class AccountsFilter @Inject constructor(val repository: AccountRepository) : Ha
             sexRequest, emailRequest, statusRequest, fnameRequest, snameRequest, phoneRequest,
             countryRequest, cityRequest, birthRequest, interestsRequest, likesRequest, premiumRequest
         )
-
-        val response = mapOf("accounts" to repository.filter(filterRequest))
-
-        return objectMapper.writeValueAsBytes(response)
+        return filterRequest
     }
 
     private fun parseNull(value: String?): Boolean? =

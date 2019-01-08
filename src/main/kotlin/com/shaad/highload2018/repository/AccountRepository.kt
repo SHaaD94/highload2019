@@ -25,18 +25,13 @@ interface AccountRepository {
 class AccountRepositoryImpl : AccountRepository {
     init {
         fixedRateTimer("", true, 0, 10_000) {
-            ids = listOf(
-                accounts0_500.keys().toList(),
-                accounts500_1000.keys().toList(),
-                accounts1000.keys().toList()
-            ).flatten()
+            ids = (1..1299999).toList().plus(accounts1300.keys)
                 .sortedDescending()
         }
     }
 
-    private val accounts0_500 = ConcurrentHashMap<Int, InnerAccount>(500_000)
-    private val accounts500_1000 = ConcurrentHashMap<Int, InnerAccount>(500_000)
-    private val accounts1000 = ConcurrentHashMap<Int, InnerAccount>(300_000)
+    private val accounts0_1300 = Array<InnerAccount?>(1_300_001) { null }
+    private val accounts1300 = ConcurrentHashMap<Int, InnerAccount>(100_000)
 
     @Volatile
     private var ids = listOf<Int>()
@@ -69,18 +64,20 @@ class AccountRepositoryImpl : AccountRepository {
 
     private val interestIndex = ConcurrentHashMap<String, MutableSet<Int>>()
 
-    private val likeIndex0_500 = ConcurrentHashMap<Int, MutableCollection<Int>>(500_000)
-    private val likeIndex500_1000 = ConcurrentHashMap<Int, MutableCollection<Int>>(500_000)
-    private val likeIndex1000 = ConcurrentHashMap<Int, MutableCollection<Int>>(500_000)
+    private val likeIndex0_1300 = Array<MutableCollection<Int>>(1_300_001) { ArrayList(30) }
+    private val likeIndex1300 = ConcurrentHashMap<Int, MutableCollection<Int>>(100_000)
 
     private val premiumIndex = ConcurrentHashMap<Int, Boolean>(700_000)
 
     override fun addAccount(account: Account) {
         withLockById(account.id) {
 
-            check(!getAccountIndex(account.id).containsKey(account.id)) { "User ${account.id} already exists" }
-            getAccountIndex(account.id)[account.id] =
-                    InnerAccount(account.email, account.birth, account.phone, account.premium)
+            check(getAccountByIndex(account.id) == null) { "User ${account.id} already exists" }
+            val innerAccount = InnerAccount(account.email, account.birth, account.phone, account.premium)
+            when {
+                account.id < 1_300_000 -> accounts0_1300[account.id] = innerAccount
+                else -> accounts1300[account.id]
+            }
 
             sexIndex.computeIfAbsent(account.sex) { concurrentHashSet(600_000) }.add(account.id)
 
@@ -132,8 +129,14 @@ class AccountRepositoryImpl : AccountRepository {
             }
 
             (account.likes ?: emptyList()).forEach { (likeId, _) ->
-                val index = getLikeIndex(likeId)
-                val collection = index.computeIfAbsent(likeId) { ArrayList(30) }
+                var collection = when {
+                    likeId < 1_300_000 -> likeIndex0_1300[likeId]
+                    else -> null
+                }
+                if (collection == null) {
+                    collection = likeIndex1300.computeIfAbsent(likeId) { ArrayList(30) }
+                }
+
                 synchronized(collection) {
                     collection.add(account.id)
                 }
@@ -204,7 +207,7 @@ class AccountRepositoryImpl : AccountRepository {
 
         filterRequest.likes?.let { (contains) ->
             contains?.let { likes ->
-                likes.map { getLikeIndex(it)[it] ?: emptyList<Int>() }.reduce { acc, list -> acc.intersect(list) }
+                likes.map { getLikesByIndex(it) as Collection<Int> }.reduce { acc, list -> acc.intersect(list) }
             }?.let { filters.add(it.toSet()) }
         }
 
@@ -214,6 +217,7 @@ class AccountRepositoryImpl : AccountRepository {
 
         return ids
             .asSequence()
+            .filter { getAccountByIndex(it) != null }
             .filter { id -> filters.all { it == ids || it.contains(id) } }
             .filter { id ->
                 filterByNull(filterRequest.fname?.nill, fnameNullIndex, id) &&
@@ -244,7 +248,7 @@ class AccountRepositoryImpl : AccountRepository {
             }
             .take(filterRequest.limit)
             .map { id ->
-                val innerAccount = getAccountIndex(id)[id]!!
+                val innerAccount = getAccountByIndex(id)!!
                 val resultObj = mutableMapOf<String, Any?>("id" to id, "email" to innerAccount.email)
 
                 filterRequest.sex?.let { resultObj["sex"] = filterRequest.sex.eq }
@@ -284,7 +288,7 @@ class AccountRepositoryImpl : AccountRepository {
         groupRequest.city?.let { cityIndex[it] ?: emptySet<Int>() }?.let { filters.add(it) }
         groupRequest.status?.let { statusIndex[it] ?: emptySet<Int>() }?.let { filters.add(it) }
         groupRequest.interests?.let { interestIndex[it] ?: emptySet<Int>() }?.let { filters.add(it) }
-        groupRequest.likes?.let { getLikeIndex(it)[it]?.toSet() ?: emptySet() }?.let { filters.add(it) }
+        groupRequest.likes?.let { getLikesByIndex(it).toSet() }?.let { filters.add(it) }
 
         //sex, status, interests, country, city
 
@@ -296,7 +300,7 @@ class AccountRepositoryImpl : AccountRepository {
 
         }
 
-        return listOf<Group>()
+        return listOf()
     }
 
     private fun queryByYear(year: Int, index: NavigableMap<Long, Int>): Collection<Int> {
@@ -319,21 +323,15 @@ class AccountRepositoryImpl : AccountRepository {
             }
         } else true
 
-    private fun withLockById(id: Int, block: () -> Unit) = synchronized(id.toString().intern()) { block() }
+    private fun withLockById(id: Int, block: () -> Unit) = synchronized(id) { block() }
 
-    private fun getLikeIndex(likeId: Int): ConcurrentHashMap<Int, MutableCollection<Int>> {
-        return when {
-            likeId < 500_000 -> likeIndex0_500
-            likeId in 500_000..999999 -> likeIndex500_1000
-            else -> likeIndex1000
-        }
+    private fun getLikesByIndex(likeId: Int): MutableCollection<Int> = when {
+        likeId < 1_300_000 -> likeIndex0_1300[likeId]
+        else -> likeIndex1300[likeId]!!
     }
 
-    private fun getAccountIndex(id: Int): ConcurrentHashMap<Int, InnerAccount> {
-        return when {
-            id < 500_000 -> accounts0_500
-            id in 500_000..999999 -> accounts500_1000
-            else -> accounts1000
-        }
+    private fun getAccountByIndex(id: Int): InnerAccount? = when {
+        id < 1_300_000 -> accounts0_1300[id]
+        else -> accounts1300[id]
     }
 }
