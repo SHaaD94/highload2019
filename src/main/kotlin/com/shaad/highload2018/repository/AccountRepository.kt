@@ -1,5 +1,6 @@
 package com.shaad.highload2018.repository
 
+import com.infinitydb.map.air.AirConcurrentMap
 import com.shaad.highload2018.domain.Account
 import com.shaad.highload2018.domain.InnerAccount
 import com.shaad.highload2018.utils.concurrentHashSet
@@ -12,7 +13,6 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentSkipListMap
 import kotlin.collections.ArrayList
 import kotlin.concurrent.fixedRateTimer
 
@@ -41,7 +41,7 @@ class AccountRepositoryImpl : AccountRepository {
     private val snameNullIndex = concurrentHashSet<Int>()
 
     private val emailDomainIndex = ConcurrentHashMap<String, MutableSet<Int>>()
-    private val emailComparingIndex = ConcurrentSkipListMap<String, Int>()
+    private val emailComparingIndex = AirConcurrentMap<String, Int>()
 
     private val phoneCodeIndex = ConcurrentHashMap<String, MutableSet<Int>>()
     private val phoneNullIndex = concurrentHashSet<Int>()
@@ -52,9 +52,9 @@ class AccountRepositoryImpl : AccountRepository {
     private val cityIndex = ConcurrentHashMap<String, MutableSet<Int>>()
     private val cityNullIndex = concurrentHashSet<Int>()
 
-    private val birthIndex = ConcurrentSkipListMap<Long, Int>()
+    private val birthIndex = AirConcurrentMap<Long, Int>()
 
-    private val joinedIndex = ConcurrentSkipListMap<Long, MutableCollection<Int>>()
+    private val joinedIndex = AirConcurrentMap<Long, MutableCollection<Int>>()
 
     private val interestIndex = ConcurrentHashMap<String, MutableSet<Int>>()
 

@@ -12,7 +12,7 @@ CMD ["java", \
 #     "-XX:+PrintGCApplicationStoppedTime",\
 \
      "-Djava.lang.Integer.IntegerCache.high=1300000",\
-     "-Dshaad.temp.dir.path=/opt/shaad/temp/dir/",\
+\
      "-XX:ParallelGCThreads=8",\
      "-Xmx1800m",\
      "-Xms1800m",\

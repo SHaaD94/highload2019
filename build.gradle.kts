@@ -24,10 +24,12 @@ plugins {
 
 repositories {
     mavenCentral()
+    maven("https://jitpack.io")
 }
 
 dependencies {
     compile(kotlin("stdlib-jdk8"))
+    compile(files("airconcurrentmap.jar"))
 //    compile("com.dslplatform", "dsl-json-java", "1.8.4")
 //    kapt("com.dslplatform","dsl-json-java8","1.8.4")
     compile("com.fasterxml.jackson.core", "jackson-core", "2.9.8")
@@ -52,30 +54,3 @@ tasks.withType<ShadowJar> {
         attributes["Main-Class"] = "com.shaad.highload2018.StarterKt"
     }
 }
-
-
-//shadowJar() {
-//    archiveName = 'puzzle.jar'
-//    mergeServiceFiles()
-//    exclude 'META-INF/.SF'
-//    exclude 'META-INF/.DSA'
-//    exclude 'META-INF/.RSA'
-//    manifest {
-//        attributes 'Main-Class': 'ru.dgis.world.puzzle.StarterKt'
-//    }
-//}
-//
-//build.dependsOn shadowJar
-//        task buildDocker(type: Docker) {
-//    dependsOn build
-//            push = environment != "local"
-//    applicationName = "puzzle"
-//    tagVersion = commitHash
-//    dockerfile = file('deploy/docker/Dockerfile')
-//    doFirst {
-//        copy {
-//            from 'build/libs/puzzle.jar'
-//            into stageDir
-//        }
-//    }
-//}

@@ -35,11 +35,22 @@ fun <T> customIntersects(
     return notSourceCollection.reduce { ac, collection -> ac.intersect(collection) }
 }
 
+suspend fun <T> suspendMeasureTimeAndReturnResult(opName: String = "", block: suspend () -> T): T {
+    val start = System.currentTimeMillis()
+    val res = block()
+    (System.currentTimeMillis() - start).let {
+        if (it > 100) {
+            println("$opName $it")
+        }
+    }
+    return res
+}
+
 fun <T> measureTimeAndReturnResult(opName: String = "", block: () -> T): T {
     val start = System.currentTimeMillis()
     val res = block()
     (System.currentTimeMillis() - start).let {
-        if (it>100){
+        if (it > 100) {
             println("$opName $it")
         }
     }
