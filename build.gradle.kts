@@ -33,6 +33,8 @@ dependencies {
     compile("com.fasterxml.jackson.core", "jackson-core", "2.9.8")
     compile("com.fasterxml.jackson.module", "jackson-module-kotlin", "2.9.8")
 
+    compile("org.jetbrains.kotlinx", "kotlinx-coroutines-core", "1.1.0")
+
     compile("org.rapidoid", "rapidoid-http-server", "5.5.5")
     compile("com.google.inject", "guice", "4.2.2")
     compile("com.google.inject.extensions", "guice-multibindings", "4.2.2")

@@ -12,6 +12,9 @@ fun main(args: Array<String>) {
     measureTimeAndReturnResult("Filling is finished in") {
         injector.getInstance(DataFiller::class.java).fill()
     }
+
+    System.gc()
+
     injector.getInstance(Server::class.java)
         .listen(80)
 }

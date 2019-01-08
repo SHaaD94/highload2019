@@ -38,6 +38,10 @@ fun <T> customIntersects(
 fun <T> measureTimeAndReturnResult(opName: String = "", block: () -> T): T {
     val start = System.currentTimeMillis()
     val res = block()
-    println(opName + " " + (System.currentTimeMillis() - start))
+    (System.currentTimeMillis() - start).let {
+        if (it>100){
+            println("$opName $it")
+        }
+    }
     return res
 }

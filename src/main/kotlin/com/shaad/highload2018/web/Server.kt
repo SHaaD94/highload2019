@@ -13,10 +13,6 @@ class Server @Inject constructor(handlers: @JvmSuppressWildcards Set<Handler>) :
 
     private val json = MediaType.create("application/json; charset=UTF-8;", "json", "map")
 
-    init {
-        System.gc()
-    }
-
     override fun handle(ctx: Channel, buf: Buf, data: RapidoidHelper): HttpStatus {
         val method = buf.get(data.verb)
         return method2Handler[method]

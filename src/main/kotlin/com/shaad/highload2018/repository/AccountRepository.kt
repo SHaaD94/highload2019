@@ -13,25 +13,33 @@ import java.time.ZoneOffset
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentSkipListMap
+import kotlin.collections.ArrayList
 import kotlin.concurrent.fixedRateTimer
 
 interface AccountRepository {
     fun addAccount(account: Account)
     fun filter(filterRequest: FilterRequest): List<MutableMap<String, Any?>>
-    fun group(groupRequest: GroupRequest): List<Group> = listOf()
+    fun group(groupRequest: GroupRequest): List<Group>
 }
 
 class AccountRepositoryImpl : AccountRepository {
     init {
         fixedRateTimer("", true, 0, 10_000) {
-            ids = accounts.keys().toList().sortedDescending()
+            ids = listOf(
+                accounts0_500.keys().toList(),
+                accounts500_1000.keys().toList(),
+                accounts1000.keys().toList()
+            ).flatten()
+                .sortedDescending()
         }
     }
 
-    private val accounts = ConcurrentHashMap<Int, InnerAccount>()
+    private val accounts0_500 = ConcurrentHashMap<Int, InnerAccount>(500_000)
+    private val accounts500_1000 = ConcurrentHashMap<Int, InnerAccount>(500_000)
+    private val accounts1000 = ConcurrentHashMap<Int, InnerAccount>(300_000)
 
     @Volatile
-    private var ids = accounts.keys().toList().sortedDescending()
+    private var ids = listOf<Int>()
 
     private val statusIndex = ConcurrentHashMap<String, MutableSet<Int>>()
 
@@ -61,14 +69,18 @@ class AccountRepositoryImpl : AccountRepository {
 
     private val interestIndex = ConcurrentHashMap<String, MutableSet<Int>>()
 
-    private val likeIndex = ConcurrentHashMap<Int, MutableCollection<Int>>(1_300_000)
+    private val likeIndex0_500 = ConcurrentHashMap<Int, MutableCollection<Int>>(500_000)
+    private val likeIndex500_1000 = ConcurrentHashMap<Int, MutableCollection<Int>>(500_000)
+    private val likeIndex1000 = ConcurrentHashMap<Int, MutableCollection<Int>>(500_000)
 
-    private val premiumIndex = ConcurrentHashMap<Int, Boolean>()
+    private val premiumIndex = ConcurrentHashMap<Int, Boolean>(700_000)
 
     override fun addAccount(account: Account) {
         withLockById(account.id) {
-            check(!accounts.containsKey(account.id)) { "User ${account.id} already exists" }
-            accounts[account.id] = InnerAccount(account.email, account.birth, account.phone, account.premium)
+
+            check(!getAccountIndex(account.id).containsKey(account.id)) { "User ${account.id} already exists" }
+            getAccountIndex(account.id)[account.id] =
+                    InnerAccount(account.email, account.birth, account.phone, account.premium)
 
             sexIndex.computeIfAbsent(account.sex) { concurrentHashSet(600_000) }.add(account.id)
 
@@ -108,6 +120,7 @@ class AccountRepositoryImpl : AccountRepository {
             } ?: cityNullIndex.add(account.id)
 
             birthIndex[account.birth] = account.id
+
             val joinedBucket = joinedIndex.computeIfAbsent(account.joined) { ArrayList(200) }
             synchronized(joinedBucket) {
                 joinedBucket.add(account.id)
@@ -119,7 +132,8 @@ class AccountRepositoryImpl : AccountRepository {
             }
 
             (account.likes ?: emptyList()).forEach { (likeId, _) ->
-                val collection = likeIndex.computeIfAbsent(likeId) { mutableListOf() }
+                val index = getLikeIndex(likeId)
+                val collection = index.computeIfAbsent(likeId) { ArrayList(30) }
                 synchronized(collection) {
                     collection.add(account.id)
                 }
@@ -190,15 +204,17 @@ class AccountRepositoryImpl : AccountRepository {
 
         filterRequest.likes?.let { (contains) ->
             contains?.let { likes ->
-                likes.map { likeIndex[it] ?: emptyList<Int>() }.reduce { acc, list -> acc.intersect(list) }
+                likes.map { getLikeIndex(it)[it] ?: emptyList<Int>() }.reduce { acc, list -> acc.intersect(list) }
             }?.let { filters.add(it.toSet()) }
+        }
+
+        if (filters.any { it.isEmpty() }) {
+            return emptyList()
         }
 
         return ids
             .asSequence()
-            .filter { id ->
-                filters.all { it == ids || it.contains(id) }
-            }
+            .filter { id -> filters.all { it == ids || it.contains(id) } }
             .filter { id ->
                 filterByNull(filterRequest.fname?.nill, fnameNullIndex, id) &&
                         filterByNull(filterRequest.sname?.nill, snameNullIndex, id) &&
@@ -228,7 +244,7 @@ class AccountRepositoryImpl : AccountRepository {
             }
             .take(filterRequest.limit)
             .map { id ->
-                val innerAccount = accounts[id]!!
+                val innerAccount = getAccountIndex(id)[id]!!
                 val resultObj = mutableMapOf<String, Any?>("id" to id, "email" to innerAccount.email)
 
                 filterRequest.sex?.let { resultObj["sex"] = filterRequest.sex.eq }
@@ -256,96 +272,32 @@ class AccountRepositoryImpl : AccountRepository {
             .toList()
     }
 
-    private val emptyInterestsList = listOf(null)
-//    override fun group(groupRequest: GroupRequest): List<Group> {
-//        val filteredIds = customIntersects(ids,
-//            groupRequest.sname?.let { snameIndex[it] ?: emptySet<Int>() } ?: ids,
-//            groupRequest.fname?.let { fnameIndex[it] ?: emptySet<Int>() } ?: ids,
-//            groupRequest.sex?.let { sexIndex[it] ?: emptySet<Int>() } ?: ids,
-//            groupRequest.birthYear?.let { queryByYear(it, birthIndex) } ?: ids,
-//            groupRequest.joinedYear?.let { queryComplexByYear(it, joinedIndex) } ?: ids,
-//            groupRequest.country?.let { countryIndex[it] ?: emptySet<Int>() } ?: ids,
-//            groupRequest.city?.let { cityIndex[it] ?: emptySet<Int>() } ?: ids,
-//            groupRequest.status?.let { statusIndex[it] ?: emptySet<Int>() } ?: ids,
-//            groupRequest.interests?.let { interestIndex[it] ?: emptySet<Int>() } ?: ids,
-//            groupRequest.likes?.let { likeIndex[it] ?: emptySet<Int>() } ?: ids
-//        )
-//
-//        val groups = HashMap<String, Int>(filteredIds.size)
-//        filteredIds
-//            .asSequence()
-//            .map { accounts[it]!! }
-//            .forEach { acc ->
-//                val keyWoInterests = StringJoiner("|")
-//
-//                if (groupRequest.keys.contains("sex")) keyWoInterests.add(acc.sex.toString())
-//                if (groupRequest.keys.contains("status")) keyWoInterests.add(acc.status)
-//                if (groupRequest.keys.contains("country")) keyWoInterests.add(acc.country)
-//                if (groupRequest.keys.contains("city")) keyWoInterests.add(acc.city)
-//
-//                val resultKeyWoInterests = keyWoInterests.toString()
-//                if (groupRequest.keys.contains("interests")) {
-//                    (acc.interests ?: emptyInterestsList).forEach {
-//                        val resultKey =
-//                            if (resultKeyWoInterests.isEmpty()) it.toString() else "$resultKeyWoInterests|$it"
-//                        groups[resultKey] = (groups[resultKey] ?: 0) + 1
-//                    }
-//                } else {
-//                    groups[resultKeyWoInterests] = (groups[resultKeyWoInterests] ?: 0) + 1
-//                }
-//            }
-//        return groups.entries.let {
-//            when {
-//                groupRequest.order > 0 -> it.sortedWith(compareBy({ it.value }, { it.key }))
-//                else -> it.sortedWith(compareByDescending<MutableMap.MutableEntry<String, Int>> { it.value }.thenByDescending { it.key })
-//            }
-//        }
-//            .take(groupRequest.limit)
-//            .map { (key, count) ->
-//                val splitKey = key.split("|")
-//                var keyCounter = 0
-//
-//                var sexChecked = false
-//                var statusChecked = false
-//                var countryChecked = false
-//                var cityChecked = false
-//                var interestsChecked = false
-//
-//                var sex: Char? = null
-//                var status: String? = null
-//                var country: String? = null
-//                var city: String? = null
-//                var interests: String? = null
-//                while (keyCounter < splitKey.size) {
-//                    when {
-//                        groupRequest.keys.contains("sex") && !sexChecked -> {
-//                            sex = nullToString(splitKey[keyCounter])?.get(0)
-//                            sexChecked = true
-//                        }
-//                        groupRequest.keys.contains("status") && !statusChecked -> {
-//                            status = nullToString(splitKey[keyCounter])
-//                            statusChecked = true
-//                        }
-//                        groupRequest.keys.contains("country") && !countryChecked -> {
-//                            country = nullToString(splitKey[keyCounter])
-//                            countryChecked = true
-//                        }
-//                        groupRequest.keys.contains("city") && !cityChecked -> {
-//                            city = nullToString(splitKey[keyCounter])
-//                            cityChecked = true
-//                        }
-//                        groupRequest.keys.contains("interests") && !interestsChecked -> {
-//                            interests = nullToString(splitKey[keyCounter])
-//                            interestsChecked = true
-//                        }
-//                    }
-//                    keyCounter++
-//                }
-//                Group(count, sex, status, interests, country, city)
-//            }
-//    }
+    override fun group(groupRequest: GroupRequest): List<Group> {
+        val filters = mutableListOf<Set<Int>>()
 
-    private fun nullToString(s: String) = if (s == "null") null else s
+        groupRequest.sname?.let { snameIndex[it] ?: emptySet<Int>() }?.let { filters.add(it) }
+        groupRequest.fname?.let { fnameIndex[it] ?: emptySet<Int>() }?.let { filters.add(it) }
+        groupRequest.sex?.let { sexIndex[it] ?: emptySet<Int>() }?.let { filters.add(it) }
+        groupRequest.birthYear?.let { queryByYear(it, birthIndex) }?.let { filters.add(it.toSet()) }
+        groupRequest.joinedYear?.let { queryComplexByYear(it, joinedIndex) }?.let { filters.add(it.toSet()) }
+        groupRequest.country?.let { countryIndex[it] ?: emptySet<Int>() }?.let { filters.add(it) }
+        groupRequest.city?.let { cityIndex[it] ?: emptySet<Int>() }?.let { filters.add(it) }
+        groupRequest.status?.let { statusIndex[it] ?: emptySet<Int>() }?.let { filters.add(it) }
+        groupRequest.interests?.let { interestIndex[it] ?: emptySet<Int>() }?.let { filters.add(it) }
+        groupRequest.likes?.let { getLikeIndex(it)[it]?.toSet() ?: emptySet() }?.let { filters.add(it) }
+
+        //sex, status, interests, country, city
+
+        if (filters.any { it.isEmpty() }) {
+            return emptyList()
+        }
+
+        if (groupRequest.keys.contains("interests")) {
+
+        }
+
+        return listOf<Group>()
+    }
 
     private fun queryByYear(year: Int, index: NavigableMap<Long, Int>): Collection<Int> {
         val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC)
@@ -368,4 +320,20 @@ class AccountRepositoryImpl : AccountRepository {
         } else true
 
     private fun withLockById(id: Int, block: () -> Unit) = synchronized(id.toString().intern()) { block() }
+
+    private fun getLikeIndex(likeId: Int): ConcurrentHashMap<Int, MutableCollection<Int>> {
+        return when {
+            likeId < 500_000 -> likeIndex0_500
+            likeId in 500_000..999999 -> likeIndex500_1000
+            else -> likeIndex1000
+        }
+    }
+
+    private fun getAccountIndex(id: Int): ConcurrentHashMap<Int, InnerAccount> {
+        return when {
+            id < 500_000 -> accounts0_500
+            id in 500_000..999999 -> accounts500_1000
+            else -> accounts1000
+        }
+    }
 }
