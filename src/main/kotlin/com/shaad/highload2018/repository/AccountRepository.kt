@@ -162,7 +162,7 @@ class AccountRepositoryImpl : AccountRepository {
 
         filterRequest.fname?.let { (eq, any, _) ->
             if (eq != null) filters.add(fnameIndex[eq] ?: emptySet())
-            if (any != null) filters.add(any.flatMap { fnameIndex[eq] ?: emptySet<Int>() }.toSet())
+            if (any != null) filters.add(any.flatMap { fnameIndex[it] ?: emptySet<Int>() }.toSet())
         }
 
         filterRequest.sname?.let { (eq, starts, _) ->
