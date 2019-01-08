@@ -23,18 +23,12 @@ interface AccountRepository {
 }
 
 class AccountRepositoryImpl : AccountRepository {
-    init {
-        fixedRateTimer("", true, 0, 10_000) {
-            ids = (1..1299999).toList().plus(accounts1300.keys)
-                .sortedDescending()
-        }
-    }
-
-    private val accounts0_1300 = Array<InnerAccount?>(1_300_001) { null }
+    private val accounts0_250 = Array<InnerAccount?>(250_000) { null }
+    private val accounts250_500 = Array<InnerAccount?>(250_000) { null }
+    private val accounts500_750 = Array<InnerAccount?>(250_000) { null }
+    private val accounts750_1000 = Array<InnerAccount?>(250_000) { null }
+    private val accounts1000_1300 = Array<InnerAccount?>(300_000) { null }
     private val accounts1300 = ConcurrentHashMap<Int, InnerAccount>(100_000)
-
-    @Volatile
-    private var ids = listOf<Int>()
 
     private val statusIndex = ConcurrentHashMap<String, MutableSet<Int>>()
 
@@ -64,10 +58,27 @@ class AccountRepositoryImpl : AccountRepository {
 
     private val interestIndex = ConcurrentHashMap<String, MutableSet<Int>>()
 
-    private val likeIndex0_1300 = Array<MutableCollection<Int>>(1_300_001) { ArrayList(30) }
+    private val likeIndex0_250 = Array<MutableCollection<Int>>(250_000) { ArrayList(30) }
+    private val likeIndex250_500 = Array<MutableCollection<Int>>(250_000) { ArrayList(30) }
+    private val likeIndex500_750 = Array<MutableCollection<Int>>(250_000) { ArrayList(30) }
+    private val likeIndex750_1000 = Array<MutableCollection<Int>>(250_000) { ArrayList(30) }
+    private val likeIndex1000_1300 = Array<MutableCollection<Int>>(300_000) { ArrayList(30) }
     private val likeIndex1300 = ConcurrentHashMap<Int, MutableCollection<Int>>(100_000)
 
     private val premiumIndex = ConcurrentHashMap<Int, Boolean>(700_000)
+
+    @Volatile
+    private var ids = listOf<Int>()
+
+    init {
+        fixedRateTimer("", true, 5_000, 10_000) {
+            try {
+                ids = accounts1300.keys.sortedByDescending { it }.plus(1299999 downTo 0)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 
     override fun addAccount(account: Account) {
         withLockById(account.id) {
@@ -75,8 +86,12 @@ class AccountRepositoryImpl : AccountRepository {
             check(getAccountByIndex(account.id) == null) { "User ${account.id} already exists" }
             val innerAccount = InnerAccount(account.email, account.birth, account.phone, account.premium)
             when {
-                account.id < 1_300_000 -> accounts0_1300[account.id] = innerAccount
-                else -> accounts1300[account.id]
+                account.id < 250_000 -> accounts0_250[account.id] = innerAccount
+                account.id in 250_000 until 500_000 -> accounts250_500[account.id - 250_000] = innerAccount
+                account.id in 500_000 until 750_000 -> accounts500_750[account.id - 500_000] = innerAccount
+                account.id in 750_000 until 1_000_000 -> accounts750_1000[account.id - 750_000] = innerAccount
+                account.id in 1_000_000 until 1_300_000 -> accounts1000_1300[account.id - 1_000_000] = innerAccount
+                else -> accounts1300[account.id] = innerAccount
             }
 
             sexIndex.computeIfAbsent(account.sex) { concurrentHashSet(600_000) }.add(account.id)
@@ -130,7 +145,11 @@ class AccountRepositoryImpl : AccountRepository {
 
             (account.likes ?: emptyList()).forEach { (likeId, _) ->
                 var collection = when {
-                    likeId < 1_300_000 -> likeIndex0_1300[likeId]
+                    likeId < 250_000 -> likeIndex0_250[likeId]
+                    likeId in 250_000 until 500_000 -> likeIndex250_500[likeId - 250_000]
+                    likeId in 500_000 until 750_000 -> likeIndex500_750[likeId - 500_000]
+                    likeId in 750_000 until 1_000_000 -> likeIndex750_1000[likeId - 750_000]
+                    likeId in 1_000_000 until 1_300_000 -> likeIndex1000_1300[likeId - 1_000_000]
                     else -> null
                 }
                 if (collection == null) {
@@ -296,6 +315,8 @@ class AccountRepositoryImpl : AccountRepository {
             return emptyList()
         }
 
+//        val groups = HashMap<Group>()
+
         if (groupRequest.keys.contains("interests")) {
 
         }
@@ -326,12 +347,21 @@ class AccountRepositoryImpl : AccountRepository {
     private fun withLockById(id: Int, block: () -> Unit) = synchronized(id) { block() }
 
     private fun getLikesByIndex(likeId: Int): MutableCollection<Int> = when {
-        likeId < 1_300_000 -> likeIndex0_1300[likeId]
+        likeId < 250_000 -> likeIndex0_250[likeId]
+        likeId in 250_000 until 500_000 -> likeIndex250_500[likeId - 250_000]
+        likeId in 500_000 until 750_000 -> likeIndex500_750[likeId - 500_000]
+        likeId in 750_000 until 1_000_000 -> likeIndex750_1000[likeId - 750_000]
+        likeId in 1_000_000 until 1_300_000 -> likeIndex1000_1300[likeId - 1_000_000]
+
         else -> likeIndex1300[likeId]!!
     }
 
     private fun getAccountByIndex(id: Int): InnerAccount? = when {
-        id < 1_300_000 -> accounts0_1300[id]
+        id < 250_000 -> accounts0_250[id]
+        id in 250_000 until 500_000 -> accounts250_500[id - 250_000]
+        id in 500_000 until 750_000 -> accounts500_750[id - 500_000]
+        id in 750_000 until 1_000_000 -> accounts750_1000[id - 750_000]
+        id in 1_000_000 until 1_300_000 -> accounts1000_1300[id - 1_000_000]
         else -> accounts1300[id]
     }
 }

@@ -25,7 +25,6 @@ class AccountsNew @Inject constructor(private val accountsRepository: AccountRep
             accountsRepository.addAccount(objectMapper.readValue<Account>(buf[bodyRange], Account::class.java))
             okResponse
         } catch (e: Exception) {
-            e.printStackTrace()
             HandlerAnswer(400, emptyResponse)
         }
     }

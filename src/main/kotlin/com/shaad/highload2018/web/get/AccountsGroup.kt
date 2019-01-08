@@ -33,10 +33,10 @@ class AccountsGroup @Inject constructor(private val accountRepository: AccountRe
                 params["likes"]?.toInt(),
                 params["limit"]!!.toInt(),
                 params["order"]?.toInt() ?: 1,
-                params["keys"]!!.split(",").toHashSet()
+                params["keys"]!!.split(",").toList()
             )
         } catch (e: Exception) {
-            return HandlerAnswer(400, e.message!!.toByteArray())
+            return HandlerAnswer(400, e.message?.toByteArray() ?: "wrong input".toByteArray())
         }
 
         return HandlerAnswer(
@@ -46,6 +46,13 @@ class AccountsGroup @Inject constructor(private val accountRepository: AccountRe
     }
 }
 
+data class GroupKey(
+    val sex: Char?,
+    val status: String?,
+    val interests: String?,
+    val country: String?,
+    val city: String?
+)
 
 data class Group(
     val count: Int,
@@ -69,5 +76,5 @@ data class GroupRequest(
     val likes: Int?,
     val limit: Int,
     val order: Int,
-    val keys: Set<String>
+    val keys: List<String>
 )

@@ -9,7 +9,7 @@ import org.rapidoid.bytes.BytesUtil
 import org.rapidoid.data.BufRange
 import org.rapidoid.http.HttpVerb
 
-class AccountsFilter @Inject constructor(val repository: AccountRepository) : HandlerBase() {
+class AccountsFilter @Inject constructor(private val repository: AccountRepository) : HandlerBase() {
     private val path = "/accounts/filter/".toByteArray()
 
     override fun method(): HttpVerb = HttpVerb.GET
