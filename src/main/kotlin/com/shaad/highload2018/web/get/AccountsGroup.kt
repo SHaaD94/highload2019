@@ -23,7 +23,6 @@ class AccountsGroup @Inject constructor(private val accountRepository: AccountRe
             GroupRequest(
                 params["sname"],
                 params["fname"],
-                /*params["phone"]*/null,
                 params["sex"]?.get(0),
                 params["birth"]?.toInt(),
                 params["country"],
@@ -60,7 +59,6 @@ data class Group(
 data class GroupRequest(
     val sname: String?,
     val fname: String?,
-    val phone: String?,
     val sex: Char?,
     val birthYear: Int?,
     val country: String?,

@@ -17,20 +17,20 @@ class Server @Inject constructor(handlers: @JvmSuppressWildcards Set<Handler>) :
         val method = buf.get(data.verb)
         return method2Handler[method]
             ?.firstOrNull { it.matches(buf, data.path) }
-            ?.let {
-                kotlin.runCatching { it.process(buf, data.path, data.query, data.body) }
+            ?.let { handler ->
+                kotlin.runCatching { handler.process(buf, data.path, data.query, data.body) }
                     .onSuccess {
                         startResponse(ctx, it.code, true)
                         writeBody(ctx, it.body, 0, it.body.size, json)
                     }
-                    .onFailure {
-                        it.printStackTrace()
+                    .onFailure { error ->
+                        error.printStackTrace()
                         startResponse(ctx, 500, true)
                         writeBody(
                             ctx,
-                            it.message?.toByteArray() ?: "Internal server error".toByteArray(),
+                            error.message?.toByteArray() ?: "Internal server error".toByteArray(),
                             0,
-                            it.message?.toByteArray()?.size ?: 21,
+                            error.message?.toByteArray()?.size ?: 21,
                             json
                         )
                     }.getOrNull()
