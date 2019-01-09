@@ -15,7 +15,7 @@ fun main(args: Array<String>) {
         )
     }
 
-    Runtime.getRuntime().addShutdownHook(Thread { println("Killed") })
+    Runtime.getRuntime().addShutdownHook(Thread { println("Killed at ${System.currentTimeMillis()}") })
 
     measureTimeAndReturnResult("Filling is finished in") {
         injector.getInstance(DataFiller::class.java).fill()

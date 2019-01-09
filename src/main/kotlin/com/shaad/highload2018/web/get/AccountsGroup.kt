@@ -41,18 +41,10 @@ class AccountsGroup @Inject constructor(private val accountRepository: AccountRe
 
         return HandlerAnswer(
             200,
-            objectMapper.writeValueAsBytes(mapOf("groups" to accountRepository.group(request)))
+            objectMapper.writeValueAsBytes(accountRepository.group(request))
         )
     }
 }
-
-data class GroupKey(
-    val sex: Char?,
-    val status: String?,
-    val interests: String?,
-    val country: String?,
-    val city: String?
-)
 
 data class Group(
     val count: Int,

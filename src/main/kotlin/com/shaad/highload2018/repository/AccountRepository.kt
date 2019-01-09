@@ -406,7 +406,7 @@ class AccountRepositoryImpl : AccountRepository {
 
         val listWithNull = listOf(null)
 
-        return ids.asSequence()
+        val tempGroups = ids.asSequence()
             .filter { id -> filters.none { !it.contains(id) } }
             .mapNotNull { getAccountByIndex(it) }
             .flatMap { acc ->
@@ -430,24 +430,48 @@ class AccountRepositoryImpl : AccountRepository {
                     )
                 )
             }.groupingBy { it }.eachCount()
-            .entries
-            //todo manual sort
-            .sortedBy { it.component2() }
-            .take(groupRequest.limit)
-            .map { (group, count) ->
-                Group(
-                    count,
-                    if (group.sex == 0) 'm' else 'f',
-                    group.status?.let { groupStatus -> statuses.entries.firstOrNull { it.value == groupStatus }?.key },
-                    group.interest?.let { groupInterest ->
-                        interests.entries.firstOrNull { it.value == groupInterest }?.key
-                    },
-                    group.country?.let { groupCountry ->
-                        countries.entries.firstOrNull { it.value == groupCountry }?.key
-                    },
-                    group.city?.let { groupCity -> cities.entries.firstOrNull { it.value == groupCity }?.key }
-                )
+            .entries.toList()
+
+        val resultGroups = ArrayList<Pair<GroupTemp, Int>>()
+        var iterations = groupRequest.limit
+        val checkedEntries = mutableListOf<Any>()
+
+        fun getComparator(pos: Int, pair: Map.Entry<GroupTemp, Int>): String? =
+            when (groupRequest.keys.getOrNull(pos)) {
+                "sex" -> if (pair.key.sex == 0) "m" else "f"
+                "status" -> pair.key.status?.let { statusesInv[it] }
+                "interests" -> pair.key.interest?.let { interestsInv[it] }
+                "country" -> pair.key.country?.let { countriesInv[it] }
+                "city" -> pair.key.city?.let { citiesInv[it] }
+                else -> null
             }
+
+        val comparator = compareBy<Map.Entry<GroupTemp, Int>>({ it.value },
+            { getComparator(0, it) }, { getComparator(1, it) }, { getComparator(2, it) },
+            { getComparator(3, it) }, { getComparator(4, it) })
+        while (iterations != 0) {
+            val element =
+                tempGroups
+                    .asSequence()
+                    .filter { e -> checkedEntries.none { e === it } }
+                    .let { groups ->
+                        if (groupRequest.order == 1) groups.minWith(comparator) else groups.maxWith(comparator)
+                    } ?: break
+            checkedEntries.add(element)
+            resultGroups.add(element.key to element.value)
+            iterations--
+        }
+
+        return resultGroups.map {
+            Group(
+                it.second,
+                if (it.first.sex == 0) 'm' else 'f',
+                it.first.status?.let { statusesInv[it] },
+                it.first.interest?.let { interestsInv[it] },
+                it.first.country?.let { countriesInv[it] },
+                it.first.city?.let { citiesInv[it] }
+            )
+        }
     }
 
     private fun queryByYear(year: Int, index: NavigableMap<Long, Int>): Collection<Int> {
