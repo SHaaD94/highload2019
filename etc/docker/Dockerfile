@@ -12,8 +12,8 @@ CMD ["java", \
      "-Djava.lang.Integer.IntegerCache.high=1300000",\
 \
      "-XX:ParallelGCThreads=4",\
-     "-XX:InitiatingHeapOccupancyPercent=70", \
-     "-XX:MaxGCPauseMillis=100",\
+     "-XX:InitiatingHeapOccupancyPercent=60", \
+     "-XX:MaxGCPauseMillis=200",\
      "-XX:G1ReservePercent=5",\
 \
      "-Xmx1700m",\

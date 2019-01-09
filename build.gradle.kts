@@ -33,6 +33,8 @@ dependencies {
 //    compile("com.dslplatform", "dsl-json-java", "1.8.4")
 //    kapt("com.dslplatform","dsl-json-java8","1.8.4")
 
+    compile("com.squareup.okhttp","okhttp","2.7.5")
+
     compile("com.fasterxml.jackson.core", "jackson-core", "2.9.8")
     compile("com.fasterxml.jackson.module", "jackson-module-kotlin", "2.9.8")
 

@@ -27,4 +27,8 @@ fun main(args: Array<String>) {
         .listen(System.getProperty("shaad.port")?.toInt() ?: 80)
 
     System.gc()
+
+    Heater().warmUp()
+
+    System.gc()
 }

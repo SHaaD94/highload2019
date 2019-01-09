@@ -70,13 +70,23 @@ class AccountRepositoryImpl : AccountRepository {
     //normalization entities
     private val idCounter = AtomicInteger()
     private val cities = ConcurrentHashMap<String, Int>()
+    private val citiesInv = ConcurrentHashMap<Int, String>()
     private val countries = ConcurrentHashMap<String, Int>()
+    private val countriesInv = ConcurrentHashMap<Int, String>()
     private val interests = ConcurrentHashMap<String, Int>()
+    private val interestsInv = ConcurrentHashMap<Int, String>()
     private val statuses = ConcurrentHashMap<String, Int>()
+    private val statusesInv = ConcurrentHashMap<Int, String>()
     private val fnames = ConcurrentHashMap<String, Int>()
+    private val fnamesInv = ConcurrentHashMap<Int, String>()
     private val snames = ConcurrentHashMap<String, Int>()
+    private val snamesInv = ConcurrentHashMap<Int, String>()
 
+    @Volatile
     private var ids = (1_700_000 downTo 0)
+
+    @Volatile
+    private var maxId = 0
 
     @Volatile
     private var emailBuckets = mapOf<Int, Set<Int>>()
@@ -93,22 +103,21 @@ class AccountRepositoryImpl : AccountRepository {
 
     override fun addAccount(account: Account) {
         withLockById(account.id) {
-
             check(getAccountByIndex(account.id) == null) { "User ${account.id} already exists" }
+
             measureTimeAndReturnResult("id index") {
                 val innerAccount = InnerAccount(
-                    statuses.computeIfAbsent(account.status) { idCounter.incrementAndGet() },
+                    writeNormalizationIndex(statuses, statusesInv, account.status),
                     account.email,
                     if (account.sex == 'm') 0 else 1,
-                    account.fname?.let { fnames.computeIfAbsent(it) { idCounter.incrementAndGet() } },
-                    account.sname?.let { snames.computeIfAbsent(it) { idCounter.incrementAndGet() } },
-                    account.city?.let { cities.computeIfAbsent(it) { idCounter.incrementAndGet() } },
-                    account.country?.let { countries.computeIfAbsent(it) { idCounter.incrementAndGet() } },
+                    account.fname?.let { writeNormalizationIndex(fnames, fnamesInv, it) },
+                    account.sname?.let { writeNormalizationIndex(snames, snamesInv, it) },
+                    account.city?.let { writeNormalizationIndex(cities, citiesInv, it) },
+                    account.country?.let { writeNormalizationIndex(countries, countriesInv, it) },
                     account.birth,
                     account.phone,
                     account.premium,
-                    account.interests?.map { interests.computeIfAbsent(it) { idCounter.incrementAndGet() } }
-                )
+                    account.interests?.map { writeNormalizationIndex(interests, interestsInv, it) })
                 when {
                     account.id < 250_000 -> accounts0_250[account.id] = innerAccount
                     account.id in 250_000 until 500_000 -> accounts250_500[account.id - 250_000] = innerAccount
@@ -219,6 +228,24 @@ class AccountRepositoryImpl : AccountRepository {
                 }
             }
         }
+        if (account.id > maxId) {
+            synchronized(maxId) {
+                maxId = account.id
+                ids = (maxId downTo 0)
+            }
+        }
+    }
+
+    private fun writeNormalizationIndex(
+        index: ConcurrentHashMap<String, Int>,
+        invIndex: ConcurrentHashMap<Int, String>,
+        property: String
+    ): Int {
+        return index.computeIfAbsent(property) {
+            val id = idCounter.incrementAndGet()
+            invIndex[id] = property
+            id
+        }
     }
 
     override fun filter(filterRequest: FilterRequest): List<MutableMap<String, Any?>> {
@@ -232,7 +259,7 @@ class AccountRepositoryImpl : AccountRepository {
 
         filterRequest.fname?.let { (eq, any, _) ->
             if (eq != null) filters.add(fnames[eq]?.let { fnameIndex[it] } ?: emptySet())
-            if (any != null) filters.add(any.flatMap { fnames[eq]?.let { fnameIndex[it] } ?: emptySet<Int>() }.toSet())
+            if (any != null) filters.add(any.flatMap { fnames[it]?.let { fnameIndex[it] } ?: emptySet<Int>() }.toSet())
         }
 
         filterRequest.sname?.let { (eq, starts, _) ->
@@ -253,9 +280,9 @@ class AccountRepositoryImpl : AccountRepository {
         }
 
         filterRequest.city?.let { (eq, any, _) ->
-            if (eq != null) filters.add(countries[eq]?.let { countryIndex[it] } ?: emptySet())
+            if (eq != null) filters.add(cities[eq]?.let { cityIndex[it] } ?: emptySet())
             if (any != null) filters.add(any.flatMap {
-                countries[it]?.let { countryIndex[it] } ?: emptySet<Int>()
+                cities[it]?.let { cityIndex[it] } ?: emptySet<Int>()
             }.toSet())
         }
 
@@ -328,20 +355,20 @@ class AccountRepositoryImpl : AccountRepository {
 
                 filterRequest.sex?.let { resultObj["sex"] = filterRequest.sex.eq }
                 filterRequest.status?.let {
-                    resultObj["status"] = statuses.entries.firstOrNull { it.value == innerAccount.status }?.key
+                    resultObj["status"] = statusesInv[innerAccount.status]
                 }
                 filterRequest.fname?.let {
-                    resultObj["fname"] = fnames.entries.firstOrNull { it.value == innerAccount.fname }?.value
+                    resultObj["fname"] = fnamesInv[innerAccount.fname]
                 }
                 filterRequest.sname?.let {
-                    resultObj["sname"] = snames.entries.firstOrNull { it.value == innerAccount.sname }?.value
+                    resultObj["sname"] = snamesInv[innerAccount.sname]
                 }
                 filterRequest.phone?.let { resultObj["phone"] = innerAccount.phone }
                 filterRequest.country?.let {
-                    resultObj["country"] = countries.entries.firstOrNull { it.value == innerAccount.country }?.value
+                    resultObj["country"] = countriesInv[innerAccount.country]
                 }
                 filterRequest.city?.let {
-                    resultObj["city"] = cities.entries.firstOrNull { it.value == innerAccount.city }?.value
+                    resultObj["city"] = citiesInv[innerAccount.city]
                 }
                 filterRequest.birth?.let { resultObj["birth"] = innerAccount.birth }
                 filterRequest.premium?.let { resultObj["premium"] = innerAccount.premium }
@@ -352,8 +379,6 @@ class AccountRepositoryImpl : AccountRepository {
     }
 
     override fun group(groupRequest: GroupRequest): List<Group> {
-        return listOf()
-
         val filters = mutableListOf<Set<Int>>()
 
         groupRequest.sname?.let { snames[it]?.let { snameIndex[it] } ?: emptySet<Int>() }?.let { filters.add(it) }
