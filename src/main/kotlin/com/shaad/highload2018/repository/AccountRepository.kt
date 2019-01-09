@@ -466,7 +466,11 @@ class AccountRepositoryImpl : AccountRepository {
         return resultGroups.map {
             Group(
                 it.second,
-                if (it.first.sex == 0) 'm' else 'f',
+                when {
+                    it.first.sex == 0 -> 'm'
+                    it.first.sex == 1 -> 'f'
+                    else -> null
+                },
                 it.first.status?.let { statusesInv[it] },
                 it.first.interest?.let { interestsInv[it] },
                 it.first.country?.let { countriesInv[it] },
