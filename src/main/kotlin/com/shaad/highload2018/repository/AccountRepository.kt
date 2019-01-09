@@ -313,6 +313,7 @@ class AccountRepositoryImpl : AccountRepository {
             }?.let { filters.add(it.toSet()) }
         }
 
+        //todo start with min and iterate by it
         if (filters.any { it.isEmpty() }) {
             return emptyList()
         }
