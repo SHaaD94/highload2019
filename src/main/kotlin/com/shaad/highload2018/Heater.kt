@@ -35,6 +35,7 @@ class Heater {
     private fun get(url: String) {
         Request.Builder().url(url).method("GET", null).build()
             .let { client.newCall(it).execute().code() }
+            .let { if (it!=200) println("WARN code is not 200!!! $url ") }
     }
 
     private fun post(url: String) {

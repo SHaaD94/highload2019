@@ -13,7 +13,7 @@ CMD ["java", \
 \
      "-XX:ParallelGCThreads=4",\
      "-XX:InitiatingHeapOccupancyPercent=60", \
-     "-XX:MaxGCPauseMillis=200",\
+     "-XX:MaxGCPauseMillis=300",\
      "-XX:G1ReservePercent=5",\
 \
      "-Xmx1700m",\

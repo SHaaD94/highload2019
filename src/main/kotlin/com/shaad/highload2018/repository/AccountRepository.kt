@@ -358,17 +358,17 @@ class AccountRepositoryImpl : AccountRepository {
                     resultObj["status"] = statusesInv[innerAccount.status]
                 }
                 filterRequest.fname?.let {
-                    resultObj["fname"] = fnamesInv[innerAccount.fname]
+                    resultObj["fname"] = innerAccount.fname?.let { fnamesInv[it] }
                 }
                 filterRequest.sname?.let {
-                    resultObj["sname"] = snamesInv[innerAccount.sname]
+                    resultObj["sname"] = innerAccount.sname?.let { snamesInv[it] }
                 }
                 filterRequest.phone?.let { resultObj["phone"] = innerAccount.phone }
                 filterRequest.country?.let {
-                    resultObj["country"] = countriesInv[innerAccount.country]
+                    resultObj["country"] = innerAccount.country?.let { countriesInv[it] }
                 }
                 filterRequest.city?.let {
-                    resultObj["city"] = citiesInv[innerAccount.city]
+                    resultObj["city"] = innerAccount.city?.let { citiesInv[it] }
                 }
                 filterRequest.birth?.let { resultObj["birth"] = innerAccount.birth }
                 filterRequest.premium?.let { resultObj["premium"] = innerAccount.premium }
