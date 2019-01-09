@@ -2,8 +2,6 @@ FROM java:8
 
 ADD *.jar app.jar
 
-RUN mkdir -p /opt/shaad/temp/dir/
-
 CMD ["java", \
 \
      "-XX:+UseG1GC",\

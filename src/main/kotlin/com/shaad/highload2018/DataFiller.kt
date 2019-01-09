@@ -6,6 +6,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.google.inject.Inject
 import com.shaad.highload2018.domain.Account
 import com.shaad.highload2018.repository.AccountRepository
+import com.shaad.highload2018.utils.measureTimeAndReturnResult
 import com.shaad.highload2018.utils.suspendMeasureTimeAndReturnResult
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.Channel
@@ -26,13 +27,13 @@ class DataFiller @Inject constructor(private val accountRepository: AccountRepos
                 val objectMapper = jacksonObjectMapper()
                     .configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true)
 
-                ZipFile(dataPath).use { zip ->
-                    for (entry in zip.entries()) {
+                measureTimeAndReturnResult("Created zip file in") { ZipFile(dataPath) }.use { zip ->
+                    val iterator = measureTimeAndReturnResult("Created zip iterator in") { zip.entries() }
+                    while (measureTimeAndReturnResult("Checked hasMoreElements in") { iterator.hasMoreElements() }) {
+                        val entry = measureTimeAndReturnResult("Next element obtained in") { iterator.nextElement() }
                         suspendMeasureTimeAndReturnResult("read file ${entry.name} in") {
                             objectMapper.readValue<Accounts>(zip.getInputStream(entry), Accounts::class.java)
-                                .accounts.forEach { acc ->
-                                accounts.send(acc)
-                            }
+                                .accounts.forEach { acc -> accounts.send(acc) }
                         }
                     }
                 }
