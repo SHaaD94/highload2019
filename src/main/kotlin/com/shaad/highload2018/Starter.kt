@@ -7,6 +7,7 @@ import com.shaad.highload2018.utils.measureTimeAndReturnResult
 import com.shaad.highload2018.web.Server
 
 fun main(args: Array<String>) {
+    println(System.currentTimeMillis())
     val injector = measureTimeAndReturnResult("Created injector in") {
         Guice.createInjector(
             Stage.PRODUCTION,

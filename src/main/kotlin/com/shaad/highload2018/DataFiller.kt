@@ -1,12 +1,10 @@
 package com.shaad.highload2018
 
 
-import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.google.inject.Inject
 import com.shaad.highload2018.domain.Account
 import com.shaad.highload2018.repository.AccountRepository
-import com.shaad.highload2018.utils.measureTimeAndReturnResult
 import com.shaad.highload2018.utils.suspendMeasureTimeAndReturnResult
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.Channel
@@ -25,13 +23,12 @@ class DataFiller @Inject constructor(private val accountRepository: AccountRepos
             val accounts = Channel<Account>(200_000)
             GlobalScope.launch {
                 val objectMapper = jacksonObjectMapper()
-                    .configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true)
 
-                measureTimeAndReturnResult("Created zip file in") { ZipFile(dataPath) }.use { zip ->
-                    val iterator = measureTimeAndReturnResult("Created zip iterator in") { zip.entries() }
-                    while (measureTimeAndReturnResult("Checked hasMoreElements in") { iterator.hasMoreElements() }) {
-                        val entry = measureTimeAndReturnResult("Next element obtained in") { iterator.nextElement() }
-                        suspendMeasureTimeAndReturnResult("read file ${entry.name} in") {
+                ZipFile(dataPath).use { zip ->
+                    val iterator = zip.entries()
+                    while (iterator.hasMoreElements()) {
+                        val entry = iterator.nextElement()
+                        suspendMeasureTimeAndReturnResult("Read file ${entry.name} in") {
                             objectMapper.readValue<Accounts>(zip.getInputStream(entry), Accounts::class.java)
                                 .accounts.forEach { acc -> accounts.send(acc) }
                         }
@@ -46,7 +43,10 @@ class DataFiller @Inject constructor(private val accountRepository: AccountRepos
             GlobalScope.launch {
                 for (id in accounts) {
                     accountRepository.addAccount(id)
-                    if (counter.incrementAndGet() % 50_000 == 0) println("Processed $counter accounts")
+                    if (counter.incrementAndGet() % 50_000 == 0) {
+                        println("Processed $counter accounts")
+                        println(System.currentTimeMillis())
+                    }
                 }
             }.join()
         }
