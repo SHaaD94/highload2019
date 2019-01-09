@@ -2,6 +2,7 @@ package com.shaad.highload2018.utils
 
 import java.time.LocalDateTime
 import java.time.ZoneOffset
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 fun parsePhoneCode(phone: String): String {
@@ -35,22 +36,33 @@ fun <T> customIntersects(
     return notSourceCollection.reduce { ac, collection -> ac.intersect(collection) }
 }
 
-suspend fun <T> suspendMeasureTimeAndReturnResult(opName: String = "", block: suspend () -> T): T {
-    val start = System.currentTimeMillis()
-    val res = block()
-    (System.currentTimeMillis() - start).let {
-        println("$opName $it")
-    }
-    return res
-}
-
 fun <T> measureTimeAndReturnResult(opName: String = "", block: () -> T): T {
     val start = System.currentTimeMillis()
     val res = block()
     (System.currentTimeMillis() - start).let {
-
-        println("$opName $it")
+        if (it > 100) {
+            println("$opName $it")
+        }
 
     }
     return res
+}
+
+class CompositeSet(private val sets: Collection<Set<Int>>) : Set<Int> {
+    override val size = sets.size
+    override fun containsAll(elements: Collection<Int>): Boolean {
+        TODO("not implemented")
+    }
+
+    override fun isEmpty(): Boolean = sets.all { it.isEmpty() }
+
+    override fun iterator(): Iterator<Int> {
+        TODO("not implemented")
+    }
+
+    override fun spliterator(): Spliterator<Int> {
+        TODO("not implemented")
+    }
+
+    override fun contains(element: Int): Boolean = sets.any { it.contains(element) }
 }

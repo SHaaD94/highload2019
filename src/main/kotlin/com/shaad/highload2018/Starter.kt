@@ -21,7 +21,7 @@ fun main(args: Array<String>) {
     System.gc()
 
     injector.getInstance(Server::class.java)
-        .listen(80)
+        .listen(System.getProperty("shaad.port")?.toInt() ?: 80)
 
     System.gc()
 }

@@ -3,9 +3,7 @@ package com.shaad.highload2018.repository
 import com.infinitydb.map.air.AirConcurrentMap
 import com.shaad.highload2018.domain.Account
 import com.shaad.highload2018.domain.InnerAccount
-import com.shaad.highload2018.utils.concurrentHashSet
-import com.shaad.highload2018.utils.now
-import com.shaad.highload2018.utils.parsePhoneCode
+import com.shaad.highload2018.utils.*
 import com.shaad.highload2018.web.get.FilterRequest
 import com.shaad.highload2018.web.get.Group
 import com.shaad.highload2018.web.get.GroupRequest
@@ -41,7 +39,7 @@ class AccountRepositoryImpl : AccountRepository {
     private val snameNullIndex = concurrentHashSet<Int>()
 
     private val emailDomainIndex = ConcurrentHashMap<String, MutableSet<Int>>()
-    private val emailComparingIndex = AirConcurrentMap<String, Int>()
+    private val emailIndex = Array<AirConcurrentMap<String, Int>>(36) { AirConcurrentMap() }
 
     private val phoneCodeIndex = ConcurrentHashMap<String, MutableSet<Int>>()
     private val phoneNullIndex = concurrentHashSet<Int>()
@@ -69,11 +67,14 @@ class AccountRepositoryImpl : AccountRepository {
 
     @Volatile
     private var ids = listOf<Int>()
+    @Volatile
+    private var emailBuckets = mapOf<Int, Set<Int>>()
 
     init {
-        fixedRateTimer("", true, 5_000, 10_000) {
+        fixedRateTimer("", true, 5_000, 5_000) {
             try {
                 ids = accounts1300.keys.sortedByDescending { it }.plus(1299999 downTo 0)
+                emailBuckets = emailIndex.mapIndexed { i, map -> i to map.values.toSet() }.toMap()
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -84,85 +85,115 @@ class AccountRepositoryImpl : AccountRepository {
         withLockById(account.id) {
 
             check(getAccountByIndex(account.id) == null) { "User ${account.id} already exists" }
-            val innerAccount = InnerAccount(account.email, account.birth, account.phone, account.premium)
-            when {
-                account.id < 250_000 -> accounts0_250[account.id] = innerAccount
-                account.id in 250_000 until 500_000 -> accounts250_500[account.id - 250_000] = innerAccount
-                account.id in 500_000 until 750_000 -> accounts500_750[account.id - 500_000] = innerAccount
-                account.id in 750_000 until 1_000_000 -> accounts750_1000[account.id - 750_000] = innerAccount
-                account.id in 1_000_000 until 1_300_000 -> accounts1000_1300[account.id - 1_000_000] = innerAccount
-                else -> accounts1300[account.id] = innerAccount
+            measureTimeAndReturnResult("id index") {
+                val innerAccount = InnerAccount(account.email, account.birth, account.phone, account.premium)
+                when {
+                    account.id < 250_000 -> accounts0_250[account.id] = innerAccount
+                    account.id in 250_000 until 500_000 -> accounts250_500[account.id - 250_000] = innerAccount
+                    account.id in 500_000 until 750_000 -> accounts500_750[account.id - 500_000] = innerAccount
+                    account.id in 750_000 until 1_000_000 -> accounts750_1000[account.id - 750_000] = innerAccount
+                    account.id in 1_000_000 until 1_300_000 -> accounts1000_1300[account.id - 1_000_000] = innerAccount
+                    else -> accounts1300[account.id] = innerAccount
+                }
             }
 
-            sexIndex.computeIfAbsent(account.sex) { concurrentHashSet(600_000) }.add(account.id)
+            measureTimeAndReturnResult("sex index:") {
+                sexIndex.computeIfAbsent(account.sex) { concurrentHashSet(600_000) }.add(account.id)
+            }
 
-            statusIndex.computeIfAbsent(account.status) { concurrentHashSet(300_000) }.add(account.id)
+            measureTimeAndReturnResult("status index:") {
+                statusIndex.computeIfAbsent(account.status) { concurrentHashSet(300_000) }.add(account.id)
+            }
 
-            account.fname?.let {
-                val collection = fnameIndex.computeIfAbsent(it) { concurrentHashSet() }
-                collection.add(account.id)
-            } ?: fnameNullIndex.add(account.id)
+            measureTimeAndReturnResult("fname index:") {
+                account.fname?.let {
+                    val collection = fnameIndex.computeIfAbsent(it) { concurrentHashSet() }
+                    collection.add(account.id)
+                } ?: fnameNullIndex.add(account.id)
+            }
 
-            account.sname?.let {
-                val collection = snameIndex.computeIfAbsent(it) { concurrentHashSet() }
-                collection.add(account.id)
-            } ?: snameNullIndex.add(account.id)
+            measureTimeAndReturnResult("sname index:") {
+                account.sname?.let {
+                    val collection = snameIndex.computeIfAbsent(it) { concurrentHashSet() }
+                    collection.add(account.id)
+                } ?: snameNullIndex.add(account.id)
+            }
 
             account.email.let { email ->
-                val domain = email.split("@").let { parsedEmail -> parsedEmail[parsedEmail.size - 1] }
-                val domainCollection = emailDomainIndex.computeIfAbsent(domain) { concurrentHashSet(100_000) }
-                domainCollection.add(account.id)
-
-                emailComparingIndex.put(email, account.id)
-            }
-            account.phone?.let { phone ->
-                val code = parsePhoneCode(phone)
-                val codeCollection = phoneCodeIndex.computeIfAbsent(code) { concurrentHashSet() }
-                codeCollection.add(account.id)
-            } ?: phoneNullIndex.add(account.id)
-
-            account.country?.let {
-                val collection = countryIndex.computeIfAbsent(it) { concurrentHashSet() }
-                collection.add(account.id)
-            } ?: countryNullIndex.add(account.id)
-
-            account.city?.let {
-                val collection = cityIndex.computeIfAbsent(it) { concurrentHashSet() }
-                collection.add(account.id)
-            } ?: cityNullIndex.add(account.id)
-
-            birthIndex[account.birth] = account.id
-
-            val joinedBucket = joinedIndex.computeIfAbsent(account.joined) { ArrayList(200) }
-            synchronized(joinedBucket) {
-                joinedBucket.add(account.id)
-            }
-
-            (account.interests ?: emptyList()).forEach {
-                val collection = interestIndex.computeIfAbsent(it) { concurrentHashSet(15_000) }
-                collection.add(account.id)
-            }
-
-            (account.likes ?: emptyList()).forEach { (likeId, _) ->
-                var collection = when {
-                    likeId < 250_000 -> likeIndex0_250[likeId]
-                    likeId in 250_000 until 500_000 -> likeIndex250_500[likeId - 250_000]
-                    likeId in 500_000 until 750_000 -> likeIndex500_750[likeId - 500_000]
-                    likeId in 750_000 until 1_000_000 -> likeIndex750_1000[likeId - 750_000]
-                    likeId in 1_000_000 until 1_300_000 -> likeIndex1000_1300[likeId - 1_000_000]
-                    else -> null
+                measureTimeAndReturnResult("email domain index:") {
+                    val domain = email.split("@").let { parsedEmail -> parsedEmail[parsedEmail.size - 1] }
+                    val domainCollection = emailDomainIndex.computeIfAbsent(domain) { concurrentHashSet(100_000) }
+                    domainCollection.add(account.id)
                 }
-                if (collection == null) {
-                    collection = likeIndex1300.computeIfAbsent(likeId) { ArrayList(30) }
+                measureTimeAndReturnResult("email index:") {
+                    addEmailToIndex(email, account.id)
                 }
+            }
 
-                synchronized(collection) {
+            measureTimeAndReturnResult("phone index:") {
+                account.phone?.let { phone ->
+                    val code = parsePhoneCode(phone)
+                    val codeCollection = phoneCodeIndex.computeIfAbsent(code) { concurrentHashSet() }
+                    codeCollection.add(account.id)
+                } ?: phoneNullIndex.add(account.id)
+            }
+
+            measureTimeAndReturnResult("country index:") {
+                account.country?.let {
+                    val collection = countryIndex.computeIfAbsent(it) { concurrentHashSet() }
+                    collection.add(account.id)
+                } ?: countryNullIndex.add(account.id)
+            }
+
+            measureTimeAndReturnResult("city index:") {
+                account.city?.let {
+                    val collection = cityIndex.computeIfAbsent(it) { concurrentHashSet() }
+                    collection.add(account.id)
+                } ?: cityNullIndex.add(account.id)
+            }
+
+            measureTimeAndReturnResult("birth index:") {
+                birthIndex[account.birth] = account.id
+            }
+
+            measureTimeAndReturnResult("joined index:") {
+                val joinedBucket = joinedIndex.computeIfAbsent(account.joined) { ArrayList(200) }
+                synchronized(joinedBucket) {
+                    joinedBucket.add(account.id)
+                }
+            }
+
+            measureTimeAndReturnResult("interest index:") {
+                (account.interests ?: emptyList()).forEach {
+                    val collection = interestIndex.computeIfAbsent(it) { concurrentHashSet(15_000) }
                     collection.add(account.id)
                 }
             }
 
-            account.premium?.let { (start, finish) ->
-                premiumIndex.computeIfAbsent(account.id) { now() in (start until finish) }
+            measureTimeAndReturnResult("like index:") {
+                (account.likes ?: emptyList()).forEach { (likeId, _) ->
+                    var collection = when {
+                        likeId < 250_000 -> likeIndex0_250[likeId]
+                        likeId in 250_000 until 500_000 -> likeIndex250_500[likeId - 250_000]
+                        likeId in 500_000 until 750_000 -> likeIndex500_750[likeId - 500_000]
+                        likeId in 750_000 until 1_000_000 -> likeIndex750_1000[likeId - 750_000]
+                        likeId in 1_000_000 until 1_300_000 -> likeIndex1000_1300[likeId - 1_000_000]
+                        else -> null
+                    }
+                    if (collection == null) {
+                        collection = likeIndex1300.computeIfAbsent(likeId) { ArrayList(30) }
+                    }
+
+                    synchronized(collection) {
+                        collection.add(account.id)
+                    }
+                }
+            }
+
+            measureTimeAndReturnResult("premium index:") {
+                account.premium?.let { (start, finish) ->
+                    premiumIndex.computeIfAbsent(account.id) { now() in (start until finish) }
+                }
             }
         }
     }
@@ -171,12 +202,9 @@ class AccountRepositoryImpl : AccountRepository {
         val filters = mutableListOf<Set<Int>>()
         filterRequest.email?.let { (domain, lt, gt) ->
             if (domain != null) filters.add(emailDomainIndex[domain] ?: emptySet())
-            when {
-                lt != null && gt != null -> emailComparingIndex.subMap(lt, gt)
-                lt != null -> emailComparingIndex.headMap(lt)
-                gt != null -> emailComparingIndex.tailMap(gt)
-                else -> null
-            }?.values?.let { filters.add(it.toSet()) }
+            if (lt != null || gt != null) {
+                filters.add(getByEmailLtGt(lt, gt))
+            }
         }
 
         filterRequest.fname?.let { (eq, any, _) ->
@@ -206,7 +234,7 @@ class AccountRepositoryImpl : AccountRepository {
 
         filterRequest.birth?.let { (lt, gt, year) ->
             when {
-                lt != null && gt != null -> birthIndex.subMap(lt, gt)
+                lt != null && gt != null -> birthIndex.subMap(gt, lt)
                 lt != null -> birthIndex.headMap(lt)
                 gt != null -> birthIndex.tailMap(gt)
                 else -> null
@@ -237,7 +265,7 @@ class AccountRepositoryImpl : AccountRepository {
         return ids
             .asSequence()
             .filter { getAccountByIndex(it) != null }
-            .filter { id -> filters.all { it == ids || it.contains(id) } }
+            .filter { id -> filters.none { !it.contains(id) } }
             .filter { id ->
                 filterByNull(filterRequest.fname?.nill, fnameNullIndex, id) &&
                         filterByNull(filterRequest.sname?.nill, snameNullIndex, id) &&
@@ -363,5 +391,69 @@ class AccountRepositoryImpl : AccountRepository {
         id in 750_000 until 1_000_000 -> accounts750_1000[id - 750_000]
         id in 1_000_000 until 1_300_000 -> accounts1000_1300[id - 1_000_000]
         else -> accounts1300[id]
+    }
+
+    private fun addEmailToIndex(email: String, id: Int) {
+        emailIndex[getLexIndex(email[0])].compute(email) { _, existingId ->
+            if (existingId != null) throw RuntimeException("email $email already binded")
+            else id
+        }
+    }
+
+    private fun getByEmailLtGt(lt: String?, gt: String?): Set<Int> {
+        check(lt != null || gt != null)
+        val ltFirst = lt?.let { getLexIndex(lt[0]) } ?: 35
+        val gtFirst = gt?.let { getLexIndex(gt[0]) } ?: 0
+
+        val localBuckets = this.emailBuckets
+        return when {
+            ltFirst < gtFirst -> emptySet()
+            ltFirst == gtFirst -> emailIndex[ltFirst].subMap(gt, true, lt, true).values.toSet()
+            else -> (gtFirst + 1 until ltFirst)
+                .map { localBuckets[it]!! }
+                .plusElement(if (lt != null) emailIndex[ltFirst].headMap(lt).values.toSet() else localBuckets[ltFirst]!!)
+                .plusElement(if (gt != null) emailIndex[gtFirst].tailMap(gt).values.toSet() else localBuckets[gtFirst]!!)
+                .let { CompositeSet(it) }
+        }
+    }
+
+    private fun getLexIndex(char: Char) = when (char) {
+        '0' -> 0
+        '1' -> 1
+        '2' -> 2
+        '3' -> 3
+        '4' -> 4
+        '5' -> 5
+        '6' -> 6
+        '7' -> 7
+        '8' -> 8
+        '9' -> 9
+        'a' -> 10
+        'b' -> 11
+        'c' -> 12
+        'd' -> 13
+        'e' -> 14
+        'f' -> 15
+        'g' -> 16
+        'h' -> 17
+        'i' -> 18
+        'j' -> 19
+        'k' -> 20
+        'l' -> 21
+        'm' -> 22
+        'n' -> 23
+        'o' -> 24
+        'p' -> 25
+        'q' -> 26
+        'r' -> 27
+        's' -> 28
+        't' -> 29
+        'u' -> 30
+        'v' -> 31
+        'w' -> 32
+        'x' -> 33
+        'y' -> 34
+        'z' -> 35
+        else -> throw RuntimeException("Unknown char $char")
     }
 }

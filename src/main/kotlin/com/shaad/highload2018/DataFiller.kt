@@ -5,7 +5,7 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.google.inject.Inject
 import com.shaad.highload2018.domain.Account
 import com.shaad.highload2018.repository.AccountRepository
-import com.shaad.highload2018.utils.suspendMeasureTimeAndReturnResult
+import com.shaad.highload2018.utils.measureTimeAndReturnResult
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -16,11 +16,11 @@ import java.util.zip.ZipFile
 private class Accounts(val accounts: List<Account>)
 
 class DataFiller @Inject constructor(private val accountRepository: AccountRepository) {
-    private val dataPath = "/tmp/data/data.zip"
+    private val dataPath = System.getProperty("shaad.tempdir") ?: "/tmp/data/data.zip"
 
     fun fill() {
         runBlocking {
-            val accounts = Channel<Account>(200_000)
+            val accounts = Channel<Account>(10_000)
             GlobalScope.launch {
                 val objectMapper = jacksonObjectMapper()
 
@@ -28,10 +28,9 @@ class DataFiller @Inject constructor(private val accountRepository: AccountRepos
                     val iterator = zip.entries()
                     while (iterator.hasMoreElements()) {
                         val entry = iterator.nextElement()
-                        suspendMeasureTimeAndReturnResult("Read file ${entry.name} in") {
+                        measureTimeAndReturnResult("Read file ${entry.name} in") {
                             objectMapper.readValue<Accounts>(zip.getInputStream(entry), Accounts::class.java)
-                                .accounts.forEach { acc -> accounts.send(acc) }
-                        }
+                        }.accounts.forEach { acc -> accounts.send(acc) }
                     }
                 }
                 println("All files read")
@@ -46,6 +45,9 @@ class DataFiller @Inject constructor(private val accountRepository: AccountRepos
                     if (counter.incrementAndGet() % 50_000 == 0) {
                         println("Processed $counter accounts")
                         println(System.currentTimeMillis())
+                    }
+                    if (counter.get() % 300_000 == 0) {
+                        System.gc()
                     }
                 }
             }.join()
