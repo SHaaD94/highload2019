@@ -41,6 +41,18 @@ data class Premium(val start: Long, val finish: Long) {
     }
 }
 
-data class Like(val id: Int, val ts: Long)
+data class Like(val id: Int?, val ts: Long)
 
-data class InnerAccount(val email: String, val birth: Long, val phone: String?, val premium: Premium?)
+data class InnerAccount(
+    val status: Int?,
+    val email: String,
+    val sex: Int?,
+    val fname: Int?,
+    val sname: Int?,
+    val city: Int?,
+    val country: Int?,
+    val birth: Long,
+    val phone: String?,
+    val premium: Premium?,
+    val interests: List<Int>?
+)
