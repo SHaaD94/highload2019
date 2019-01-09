@@ -11,6 +11,9 @@ import org.rapidoid.http.HttpVerb
 
 class AccountsGroup @Inject constructor(private val accountRepository: AccountRepository) : HandlerBase() {
     private val path = "/accounts/group/".toByteArray()
+
+    private val allowedGroupKeys = setOf("sex", "status", "interests", "country", "city")
+
     override fun method(): HttpVerb = HttpVerb.GET
 
     override fun matches(buf: Buf, pathRange: BufRange): Boolean =
@@ -33,7 +36,10 @@ class AccountsGroup @Inject constructor(private val accountRepository: AccountRe
                 params["likes"]?.toInt(),
                 params["limit"]!!.toInt(),
                 params["order"]?.toInt() ?: 1,
-                params["keys"]!!.split(",").toList()
+                params["keys"]!!.split(",").toList().let {
+                    if (it.any { !allowedGroupKeys.contains(it) }) throw RuntimeException("Wrong keys $it")
+                    else it
+                }
             )
         } catch (e: Exception) {
             return HandlerAnswer(400, e.message?.toByteArray() ?: "wrong input".toByteArray())
@@ -41,7 +47,7 @@ class AccountsGroup @Inject constructor(private val accountRepository: AccountRe
 
         return HandlerAnswer(
             200,
-            objectMapper.writeValueAsBytes(accountRepository.group(request))
+            objectMapper.writeValueAsBytes(mapOf("groups" to accountRepository.group(request)))
         )
     }
 }
