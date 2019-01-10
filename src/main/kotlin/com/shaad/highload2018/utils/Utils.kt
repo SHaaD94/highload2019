@@ -49,7 +49,7 @@ fun <T> measureTimeAndReturnResult(opName: String = "", block: () -> T): T {
 }
 
 class CompositeSet(private val sets: Collection<Set<Int>>) : Set<Int> {
-    override val size = sets.size
+    override val size = sets.sumBy { it.size }
     override fun containsAll(elements: Collection<Int>): Boolean {
         TODO("not implemented")
     }

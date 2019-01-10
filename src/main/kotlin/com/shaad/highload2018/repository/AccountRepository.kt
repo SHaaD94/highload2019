@@ -52,9 +52,9 @@ class AccountRepositoryImpl : AccountRepository {
     private val cityIndex = ConcurrentHashMap<Int, MutableSet<Int>>()
     private val cityNullIndex = concurrentHashSet<Int>()
 
-    private val birthIndex = AirConcurrentMap<Long, Int>()
+    private val birthIndex = AirConcurrentMap<Int, Int>()
 
-    private val joinedIndex = AirConcurrentMap<Long, MutableCollection<Int>>()
+    private val joinedIndex = AirConcurrentMap<Int, MutableCollection<Int>>()
 
     private val interestIndex = ConcurrentHashMap<Int, MutableSet<Int>>()
 
@@ -102,11 +102,12 @@ class AccountRepositoryImpl : AccountRepository {
     }
 
     override fun addAccount(account: Account) {
-        withLockById(account.id) {
+        withLockById(account.id!!) {
             check(getAccountByIndex(account.id) == null) { "User ${account.id} already exists" }
 
             measureTimeAndReturnResult("id index") {
                 val innerAccount = InnerAccount(
+                    account.id,
                     writeNormalizationIndex(statuses, statusesInv, account.status),
                     account.email,
                     if (account.sex == 'm') 0 else 1,
@@ -117,7 +118,9 @@ class AccountRepositoryImpl : AccountRepository {
                     account.birth,
                     account.phone,
                     account.premium,
-                    account.interests?.map { writeNormalizationIndex(interests, interestsInv, it) })
+                    account.interests?.map { writeNormalizationIndex(interests, interestsInv, it) }
+                    //account.likes?.map {  InnerLike(it) }
+                )
                 when {
                     account.id < 250_000 -> accounts0_250[account.id] = innerAccount
                     account.id in 250_000 until 500_000 -> accounts250_500[account.id - 250_000] = innerAccount
@@ -313,7 +316,6 @@ class AccountRepositoryImpl : AccountRepository {
             }?.let { filters.add(it.toSet()) }
         }
 
-        //todo start with min and iterate by it
         if (filters.any { it.isEmpty() }) {
             return emptyList()
         }
@@ -479,16 +481,16 @@ class AccountRepositoryImpl : AccountRepository {
         }
     }
 
-    private fun queryByYear(year: Int, index: NavigableMap<Long, Int>): Collection<Int> {
-        val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC)
-        val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC) - 1
-        return index.subMap(from, to).values
+    private fun queryByYear(year: Int, index: NavigableMap<Int, Int>): Collection<Int> {
+        val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC).toInt()
+        val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC).toInt() - 1
+        return index.subMap(from, true, to, true).values
     }
 
-    private fun queryComplexByYear(year: Int, index: NavigableMap<Long, MutableCollection<Int>>): Collection<Int> {
-        val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC)
-        val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC) - 1
-        return index.subMap(from, to).flatMap { it.value }
+    private fun queryComplexByYear(year: Int, index: NavigableMap<Int, MutableCollection<Int>>): Collection<Int> {
+        val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC).toInt()
+        val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC).toInt() - 1
+        return index.subMap(from, true, to, true).flatMap { it.value }
     }
 
     private fun filterByNull(nill: Boolean?, index: Set<Int>, id: Int) =

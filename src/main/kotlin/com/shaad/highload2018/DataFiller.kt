@@ -5,7 +5,6 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.google.inject.Inject
 import com.shaad.highload2018.domain.Account
 import com.shaad.highload2018.repository.AccountRepository
-import com.shaad.highload2018.utils.measureTimeAndReturnResult
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -28,9 +27,8 @@ class DataFiller @Inject constructor(private val accountRepository: AccountRepos
                     val iterator = zip.entries()
                     while (iterator.hasMoreElements()) {
                         val entry = iterator.nextElement()
-                        measureTimeAndReturnResult("Read file ${entry.name} in") {
-                            objectMapper.readValue<Accounts>(zip.getInputStream(entry), Accounts::class.java)
-                        }.accounts.forEach { acc -> accounts.send(acc) }
+                        objectMapper.readValue<Accounts>(zip.getInputStream(entry), Accounts::class.java)
+                            .accounts.forEach { acc -> accounts.send(acc) }
                     }
                 }
                 println("All files read")
@@ -44,7 +42,6 @@ class DataFiller @Inject constructor(private val accountRepository: AccountRepos
                     accountRepository.addAccount(id)
                     if (counter.incrementAndGet() % 50_000 == 0) {
                         println("Processed $counter accounts")
-                        println(System.currentTimeMillis())
                     }
                     if (counter.get() % 300_000 == 0) {
                         System.gc()

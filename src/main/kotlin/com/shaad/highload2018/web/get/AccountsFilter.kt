@@ -59,8 +59,8 @@ class AccountsFilter @Inject constructor(private val repository: AccountReposito
         var cityAny: String? = null
         var cityNull: String? = null
 
-        var birthLt: Long? = null
-        var birthGt: Long? = null
+        var birthLt: Int? = null
+        var birthGt: Int? = null
         var birthYear: Int? = null
 
         var interestsContains: String? = null
@@ -101,8 +101,8 @@ class AccountsFilter @Inject constructor(private val repository: AccountReposito
                 "city_any" -> cityAny = value
                 "city_null" -> cityNull = value
 
-                "birth_lt" -> birthLt = value.toLong()
-                "birth_gt" -> birthGt = value.toLong()
+                "birth_lt" -> birthLt = value.toInt()
+                "birth_gt" -> birthGt = value.toInt()
                 "birth_year" -> birthYear = value.toInt()
 
                 "interests_contains" -> interestsContains = value
@@ -226,8 +226,8 @@ data class CityRequest(
 )
 
 data class BirthRequest(
-    val lt: Long?,
-    val gt: Long?,
+    val lt: Int?,
+    val gt: Int?,
     val year: Int?
 )
 

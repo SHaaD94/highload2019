@@ -1,7 +1,7 @@
 package com.shaad.highload2018.domain
 
 data class Account(
-    val id: Int,
+    val id: Int?,
     // max 100 symbols, unique
     val email: String,
     // max 50 symbols
@@ -12,7 +12,7 @@ data class Account(
     // m or f
     val sex: Char,
     // from 01.01.1950 to 01.01.2005
-    val birth: Long,
+    val birth: Int,
     // max 50 symbols
     val country: String?,
     // max 50 symbols
@@ -21,7 +21,7 @@ data class Account(
     //------------
 
     // from 01.01.2011 to 01.01.2018.
-    val joined: Long,
+    val joined: Int,
 
     //"свободны", "заняты", "всё сложно"
     val status: String,
@@ -35,15 +35,16 @@ data class Account(
 )
 
 //min 01.01.2018
-data class Premium(val start: Long, val finish: Long) {
+data class Premium(val start: Int, val finish: Int) {
     init {
         check(start < finish)
     }
 }
 
-data class Like(val id: Int?, val ts: Long)
+data class Like(val id: Int?, val ts: Int)
 
 data class InnerAccount(
+    val id: Int?,
     val status: Int?,
     val email: String,
     val sex: Int?,
@@ -51,8 +52,13 @@ data class InnerAccount(
     val sname: Int?,
     val city: Int?,
     val country: Int?,
-    val birth: Long,
+    val birth: Int,
     val phone: String?,
     val premium: Premium?,
-    val interests: List<Int>?
+    val interests: List<Int>?/*,
+    val likes: List<InnerLike>?*/
 )
+
+data class InnerLike(val id: Int?, val days: Int?, val ms: Int?) {
+    constructor(like: Like) : this(like.id, like.ts / 86400, like.ts % 86400)
+}

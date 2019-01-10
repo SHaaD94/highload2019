@@ -4,10 +4,15 @@ import com.squareup.okhttp.MediaType
 import com.squareup.okhttp.OkHttpClient
 import com.squareup.okhttp.Request
 import com.squareup.okhttp.RequestBody
+import java.util.concurrent.TimeUnit
 
 class Heater {
     val client = OkHttpClient()
     fun warmUp() {
+        client.setConnectTimeout(2, TimeUnit.MINUTES)
+        client.setReadTimeout(2, TimeUnit.MINUTES)
+        client.setWriteTimeout(2, TimeUnit.MINUTES)
+
         val localhost = "http://127.0.0.1"
 
         listOf(
@@ -35,7 +40,7 @@ class Heater {
     private fun get(url: String) {
         Request.Builder().url(url).method("GET", null).build()
             .let { client.newCall(it).execute().code() }
-            .let { if (it!=200) println("WARN code is not 200!!! $url ") }
+            .let { if (it != 200) println("WARN code is not 200!!! $url ") }
     }
 
     private fun post(url: String) {
