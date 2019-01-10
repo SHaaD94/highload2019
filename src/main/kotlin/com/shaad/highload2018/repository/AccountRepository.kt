@@ -3,7 +3,10 @@ package com.shaad.highload2018.repository
 import com.infinitydb.map.air.AirConcurrentMap
 import com.shaad.highload2018.domain.Account
 import com.shaad.highload2018.domain.InnerAccount
-import com.shaad.highload2018.utils.*
+import com.shaad.highload2018.utils.CompositeSet
+import com.shaad.highload2018.utils.concurrentHashSet
+import com.shaad.highload2018.utils.measureTimeAndReturnResult
+import com.shaad.highload2018.utils.parsePhoneCode
 import com.shaad.highload2018.web.get.FilterRequest
 import com.shaad.highload2018.web.get.Group
 import com.shaad.highload2018.web.get.GroupRequest
@@ -37,22 +40,17 @@ class AccountRepositoryImpl : AccountRepository {
     private val sexIndex = HashMap<Char, MutableSet<Int>>()
 
     private val fnameIndex = ConcurrentHashMap<Int, MutableSet<Int>>()
-    private val fnameNullIndex = concurrentHashSet<Int>()
 
     private val snameIndex = ConcurrentHashMap<Int, MutableSet<Int>>()
-    private val snameNullIndex = concurrentHashSet<Int>()
 
     private val emailDomainIndex = ConcurrentHashMap<String, MutableSet<Int>>()
     private val emailIndex = Array<AirConcurrentMap<String, Int>>(36) { AirConcurrentMap() }
 
     private val phoneCodeIndex = Array<MutableSet<Int>>(1000) { HashSet() }
-    private val phoneNullIndex = concurrentHashSet<Int>()
 
     private val countryIndex = ConcurrentHashMap<Int, MutableSet<Int>>()
-    private val countryNullIndex = concurrentHashSet<Int>()
 
     private val cityIndex = ConcurrentHashMap<Int, MutableSet<Int>>()
-    private val cityNullIndex = concurrentHashSet<Int>()
 
     private val birthIndex = AirConcurrentMap<Int, Int>()
 
@@ -66,8 +64,6 @@ class AccountRepositoryImpl : AccountRepository {
     private val likeIndex750_1000 = Array<MutableCollection<Int>>(250_000) { ArrayList(30) }
     private val likeIndex1000_1300 = Array<MutableCollection<Int>>(300_000) { ArrayList(30) }
     private val likeIndex1300 = ConcurrentHashMap<Int, MutableCollection<Int>>(100_000)
-
-    private val premiumIndex = ConcurrentHashMap<Int, Boolean>(700_000)
 
     //normalization entities
     private val idCounter = AtomicInteger()
@@ -145,14 +141,14 @@ class AccountRepositoryImpl : AccountRepository {
                 account.fname?.let {
                     val collection = fnameIndex.computeIfAbsent(fnames[it]!!) { concurrentHashSet() }
                     collection.add(account.id)
-                } ?: fnameNullIndex.add(account.id)
+                }
             }
 
             measureTimeAndReturnResult("sname index:") {
                 account.sname?.let {
                     val collection = snameIndex.computeIfAbsent(snames[it]!!) { concurrentHashSet() }
                     collection.add(account.id)
-                } ?: snameNullIndex.add(account.id)
+                }
             }
 
             account.email.let { email ->
@@ -174,21 +170,21 @@ class AccountRepositoryImpl : AccountRepository {
                         codeCollection.add(account.id)
                     }
 
-                } ?: phoneNullIndex.add(account.id)
+                }
             }
 
             measureTimeAndReturnResult("country index:") {
                 account.country?.let {
                     val collection = countryIndex.computeIfAbsent(countries[it]!!) { concurrentHashSet() }
                     collection.add(account.id)
-                } ?: countryNullIndex.add(account.id)
+                }
             }
 
             measureTimeAndReturnResult("city index:") {
                 account.city?.let {
                     val collection = cityIndex.computeIfAbsent(cities[it]!!) { concurrentHashSet() }
                     collection.add(account.id)
-                } ?: cityNullIndex.add(account.id)
+                }
             }
 
             measureTimeAndReturnResult("birth index:") {
@@ -230,11 +226,6 @@ class AccountRepositoryImpl : AccountRepository {
                 }
             }
 
-            measureTimeAndReturnResult("premium index:") {
-                account.premium?.let { (start, finish) ->
-                    premiumIndex.computeIfAbsent(account.id) { now() in (start until finish) }
-                }
-            }
         }
         if (account.id > maxId) {
             synchronized(maxId) {
@@ -327,39 +318,34 @@ class AccountRepositoryImpl : AccountRepository {
 
         return ids
             .asSequence()
-            .filter { getAccountByIndex(it) != null }
-            .filter { id -> filters.none { !it.contains(id) } }
+            .mapNotNull { getAccountByIndex(it) }
             .filter { id ->
-                filterByNull(filterRequest.fname?.nill, fnameNullIndex, id) &&
-                        filterByNull(filterRequest.sname?.nill, snameNullIndex, id) &&
-                        filterByNull(filterRequest.phone?.nill, phoneNullIndex, id) &&
-                        filterByNull(filterRequest.country?.nill, countryNullIndex, id) &&
-                        filterByNull(filterRequest.city?.nill, cityNullIndex, id)
+                filterByNull(filterRequest.fname?.nill, id.fname) &&
+                        filterByNull(filterRequest.sname?.nill, id.sname) &&
+                        filterByNull(filterRequest.phone?.nill, id.phone) &&
+                        filterByNull(filterRequest.country?.nill, id.country) &&
+                        filterByNull(filterRequest.city?.nill, id.city) &&
+                        filterByNull(filterRequest.premium?.nill, id.premium)
             }
-            .filter { id ->
-                filterRequest.premium?.let { (now, nill) ->
-                    val filterByNow = if (now != null) premiumIndex[id] == true else true
-                    val filterByNill = if (nill != null) {
-                        when (nill) {
-                            true -> premiumIndex.containsKey(id)
-                            false -> !premiumIndex.containsKey(id)
-                        }
-                    } else true
-                    filterByNill && filterByNow
+            .filter { acc -> filters.none { !it.contains(acc.id) } }
+            .filter { acc ->
+                filterRequest.premium?.let { (now, _) ->
+                    if (now != null) acc.premium?.let {
+                        System.currentTimeMillis() in (it.start..it.finish)
+                    } == true else true
                 } ?: true
             }
-            .filter { id -> if (filterRequest.sex != null) sexIndex[filterRequest.sex.eq]!!.contains(id) else true }
-            .filter { id ->
+            .filter { acc -> if (filterRequest.sex != null) int2Sex(acc.sex) == filterRequest.sex.eq else true }
+            .filter { acc ->
                 filterRequest.status?.let { (eq, neq) ->
-                    val eqDecision = eq?.let { statusIndex[statuses[it]]!!.contains(id) } ?: true
-                    val neqDecision = neq?.let { !statusIndex[statuses[it]]!!.contains(id) } ?: true
+                    val eqDecision = eq?.let { statuses[it] == acc.status } ?: true
+                    val neqDecision = neq?.let { statuses[it] != acc.status } ?: true
                     neqDecision && eqDecision
                 } ?: true
             }
             .take(filterRequest.limit)
-            .map { id ->
-                val innerAccount = getAccountByIndex(id)!!
-                val resultObj = mutableMapOf<String, Any?>("id" to id, "email" to innerAccount.email)
+            .map { innerAccount ->
+                val resultObj = mutableMapOf("id" to innerAccount.id, "email" to innerAccount.email)
 
                 filterRequest.sex?.let { resultObj["sex"] = filterRequest.sex.eq }
                 filterRequest.status?.let {
@@ -371,7 +357,9 @@ class AccountRepositoryImpl : AccountRepository {
                 filterRequest.sname?.let {
                     resultObj["sname"] = innerAccount.sname?.let { snamesInv[it] }
                 }
-                filterRequest.phone?.let { resultObj["phone"] = innerAccount.phone }
+                filterRequest.phone?.let {
+                    resultObj["phone"] = innerAccount.id
+                }
                 filterRequest.country?.let {
                     resultObj["country"] = innerAccount.country?.let { countriesInv[it] }
                 }
@@ -446,7 +434,7 @@ class AccountRepositoryImpl : AccountRepository {
 
         fun getComparator(pos: Int, pair: Map.Entry<GroupTemp, Int>): String? =
             when (groupRequest.keys.getOrNull(pos)) {
-                "sex" -> if (pair.key.sex == 0) "m" else "f"
+                "sex" -> int2Sex(pair.key.sex).toString()
                 "status" -> pair.key.status?.let { statusesInv[it] }
                 "interests" -> pair.key.interest?.let { interestsInv[it] }
                 "country" -> pair.key.country?.let { countriesInv[it] }
@@ -486,6 +474,12 @@ class AccountRepositoryImpl : AccountRepository {
         }
     }
 
+    private fun int2Sex(int: Int?) = when {
+        int == 0 -> 'm'
+        int == 1 -> 'f'
+        else -> null
+    }
+
     private fun queryByYear(year: Int, index: NavigableMap<Int, Int>): Collection<Int> {
         val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC).toInt()
         val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC).toInt() - 1
@@ -498,27 +492,28 @@ class AccountRepositoryImpl : AccountRepository {
         return index.subMap(from, true, to, true).flatMap { it.value }
     }
 
-    private fun filterByNull(nill: Boolean?, index: Set<Int>, id: Int) =
+    private fun filterByNull(nill: Boolean?, property: Any?) =
         if (nill != null) {
             when (nill) {
-                true -> !index.contains(id)
-                false -> index.contains(id)
+                true -> property != null
+                false -> property == null
             }
         } else true
 
     private fun withLockById(id: Int, block: () -> Unit) = synchronized(id) { block() }
 
-    private fun getLikesByIndex(likeId: Int): MutableCollection<Int> = when {
-        likeId < 250_000 -> likeIndex0_250[likeId]
-        likeId in 250_000 until 500_000 -> likeIndex250_500[likeId - 250_000]
-        likeId in 500_000 until 750_000 -> likeIndex500_750[likeId - 500_000]
-        likeId in 750_000 until 1_000_000 -> likeIndex750_1000[likeId - 750_000]
-        likeId in 1_000_000 until 1_300_000 -> likeIndex1000_1300[likeId - 1_000_000]
+    private fun getLikesByIndex(likeId: Int): MutableCollection<Int> =
+        when {
+            likeId < 250_000 -> likeIndex0_250[likeId]
+            likeId in 250_000 until 500_000 -> likeIndex250_500[likeId - 250_000]
+            likeId in 500_000 until 750_000 -> likeIndex500_750[likeId - 500_000]
+            likeId in 750_000 until 1_000_000 -> likeIndex750_1000[likeId - 750_000]
+            likeId in 1_000_000 until 1_300_000 -> likeIndex1000_1300[likeId - 1_000_000]
 
-        else -> likeIndex1300[likeId]!!
-    }
+            else -> likeIndex1300[likeId]!!
+        }
 
-    private fun getAccountByIndex(id: Int): InnerAccount? = when {
+    fun getAccountByIndex(id: Int): InnerAccount? = when {
         id < 250_000 -> accounts0_250[id]
         id in 250_000 until 500_000 -> accounts250_500[id - 250_000]
         id in 500_000 until 750_000 -> accounts500_750[id - 500_000]
@@ -590,4 +585,5 @@ class AccountRepositoryImpl : AccountRepository {
         'z' -> 35
         else -> throw RuntimeException("Unknown char $char")
     }
+
 }

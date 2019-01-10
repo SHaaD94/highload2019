@@ -35,7 +35,6 @@ class Heater {
         ).forEach { url -> repeat(10) { post(url) } }
 
         println("Warmed up!")
-        client.connectionPool.evictAll()
     }
 
     private fun get(url: String) {
