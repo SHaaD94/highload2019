@@ -4,7 +4,7 @@ import com.infinitydb.map.air.AirConcurrentMap
 import com.shaad.highload2018.domain.Account
 import com.shaad.highload2018.domain.InnerAccount
 import com.shaad.highload2018.utils.CompositeSet
-import com.shaad.highload2018.utils.concurrentHashSet
+import com.shaad.highload2018.utils.generateSequenceFromIndexes
 import com.shaad.highload2018.utils.measureTimeAndReturnResult
 import com.shaad.highload2018.utils.parsePhoneCode
 import com.shaad.highload2018.web.get.FilterRequest
@@ -17,7 +17,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
-import kotlin.collections.HashSet
 import kotlin.concurrent.fixedRateTimer
 
 interface AccountRepository {
@@ -35,35 +34,35 @@ class AccountRepositoryImpl : AccountRepository {
     private val accounts1000_1300 = Array<InnerAccount?>(300_000) { null }
     private val accounts1300 = ConcurrentHashMap<Int, InnerAccount>(100_000)
 
-    private val statusIndex = HashMap<Int, MutableSet<Int>>()
+    private val statusIndex = HashMap<Int, ArrayList<Int>>()
 
-    private val sexIndex = HashMap<Char, MutableSet<Int>>()
+    private val sexIndex = HashMap<Char, ArrayList<Int>>()
 
-    private val fnameIndex = ConcurrentHashMap<Int, MutableSet<Int>>()
+    private val fnameIndex = ConcurrentHashMap<Int, ArrayList<Int>>()
 
-    private val snameIndex = ConcurrentHashMap<Int, MutableSet<Int>>()
+    private val snameIndex = ConcurrentHashMap<Int, ArrayList<Int>>()
 
-    private val emailDomainIndex = ConcurrentHashMap<String, MutableSet<Int>>()
+    private val emailDomainIndex = ConcurrentHashMap<String, ArrayList<Int>>()
     private val emailIndex = Array<AirConcurrentMap<String, Int>>(36) { AirConcurrentMap() }
 
-    private val phoneCodeIndex = Array<MutableSet<Int>>(1000) { HashSet() }
+    private val phoneCodeIndex = Array<ArrayList<Int>>(1000) { ArrayList() }
 
-    private val countryIndex = ConcurrentHashMap<Int, MutableSet<Int>>()
+    private val countryIndex = ConcurrentHashMap<Int, ArrayList<Int>>()
 
-    private val cityIndex = ConcurrentHashMap<Int, MutableSet<Int>>()
+    private val cityIndex = ConcurrentHashMap<Int, ArrayList<Int>>()
 
     private val birthIndex = AirConcurrentMap<Int, Int>()
 
     private val joinedIndex = AirConcurrentMap<Int, MutableCollection<Int>>()
 
-    private val interestIndex = ConcurrentHashMap<Int, MutableSet<Int>>()
+    private val interestIndex = ConcurrentHashMap<Int, ArrayList<Int>>()
 
-    private val likeIndex0_250 = Array<MutableCollection<Int>>(250_000) { ArrayList(30) }
-    private val likeIndex250_500 = Array<MutableCollection<Int>>(250_000) { ArrayList(30) }
-    private val likeIndex500_750 = Array<MutableCollection<Int>>(250_000) { ArrayList(30) }
-    private val likeIndex750_1000 = Array<MutableCollection<Int>>(250_000) { ArrayList(30) }
-    private val likeIndex1000_1300 = Array<MutableCollection<Int>>(300_000) { ArrayList(30) }
-    private val likeIndex1300 = ConcurrentHashMap<Int, MutableCollection<Int>>(100_000)
+    private val likeIndex0_250 = Array<ArrayList<Int>>(250_000) { ArrayList() }
+    private val likeIndex250_500 = Array<ArrayList<Int>>(250_000) { ArrayList() }
+    private val likeIndex500_750 = Array<ArrayList<Int>>(250_000) { ArrayList() }
+    private val likeIndex750_1000 = Array<ArrayList<Int>>(250_000) { ArrayList() }
+    private val likeIndex1000_1300 = Array<ArrayList<Int>>(300_000) { ArrayList() }
+    private val likeIndex1300 = ConcurrentHashMap<Int, ArrayList<Int>>(100_000)
 
     //normalization entities
     private val idCounter = AtomicInteger()
@@ -130,32 +129,34 @@ class AccountRepositoryImpl : AccountRepository {
             }
 
             measureTimeAndReturnResult("sex index:") {
-                sexIndex.computeIfAbsent(account.sex) { concurrentHashSet(600_000) }.add(account.id)
+                val collection = sexIndex.computeIfAbsent(account.sex) { ArrayList() }
+                addToSortedCollection(collection, account.id)
             }
 
             measureTimeAndReturnResult("status index:") {
-                statusIndex.computeIfAbsent(statuses[account.status]!!) { concurrentHashSet(300_000) }.add(account.id)
+                val collection = statusIndex.computeIfAbsent(statuses[account.status]!!) { ArrayList() }
+                addToSortedCollection(collection, account.id)
             }
 
             measureTimeAndReturnResult("fname index:") {
                 account.fname?.let {
-                    val collection = fnameIndex.computeIfAbsent(fnames[it]!!) { concurrentHashSet() }
-                    collection.add(account.id)
+                    val collection = fnameIndex.computeIfAbsent(fnames[it]!!) { ArrayList() }
+                    addToSortedCollection(collection, account.id)
                 }
             }
 
             measureTimeAndReturnResult("sname index:") {
                 account.sname?.let {
-                    val collection = snameIndex.computeIfAbsent(snames[it]!!) { concurrentHashSet() }
-                    collection.add(account.id)
+                    val collection = snameIndex.computeIfAbsent(snames[it]!!) { ArrayList() }
+                    addToSortedCollection(collection, account.id)
                 }
             }
 
             account.email.let { email ->
                 measureTimeAndReturnResult("email domain index:") {
                     val domain = email.split("@").let { parsedEmail -> parsedEmail[parsedEmail.size - 1] }
-                    val domainCollection = emailDomainIndex.computeIfAbsent(domain) { concurrentHashSet(100_000) }
-                    domainCollection.add(account.id)
+                    val collection = emailDomainIndex.computeIfAbsent(domain) { ArrayList() }
+                    addToSortedCollection(collection, account.id)
                 }
                 measureTimeAndReturnResult("email index:") {
                     addEmailToIndex(email, account.id)
@@ -175,15 +176,15 @@ class AccountRepositoryImpl : AccountRepository {
 
             measureTimeAndReturnResult("country index:") {
                 account.country?.let {
-                    val collection = countryIndex.computeIfAbsent(countries[it]!!) { concurrentHashSet() }
-                    collection.add(account.id)
+                    val collection = countryIndex.computeIfAbsent(countries[it]!!) { ArrayList() }
+                    addToSortedCollection(collection, account.id)
                 }
             }
 
             measureTimeAndReturnResult("city index:") {
                 account.city?.let {
-                    val collection = cityIndex.computeIfAbsent(cities[it]!!) { concurrentHashSet() }
-                    collection.add(account.id)
+                    val collection = cityIndex.computeIfAbsent(cities[it]!!) { ArrayList() }
+                    addToSortedCollection(collection, account.id)
                 }
             }
 
@@ -200,7 +201,7 @@ class AccountRepositoryImpl : AccountRepository {
 
             measureTimeAndReturnResult("interest index:") {
                 (account.interests ?: emptyList()).forEach {
-                    val collection = interestIndex.computeIfAbsent(interests[it]!!) { concurrentHashSet(15_000) }
+                    val collection = interestIndex.computeIfAbsent(interests[it]!!) { ArrayList(15_000) }
                     collection.add(account.id)
                 }
             }
@@ -220,9 +221,7 @@ class AccountRepositoryImpl : AccountRepository {
                         collection = likeIndex1300.computeIfAbsent(likeId) { ArrayList(30) }
                     }
 
-                    synchronized(collection) {
-                        collection.add(account.id)
-                    }
+                    addToSortedCollection(collection, account.id)
                 }
             }
 
@@ -249,40 +248,43 @@ class AccountRepositoryImpl : AccountRepository {
 
     override fun filter(filterRequest: FilterRequest): List<MutableMap<String, Any?>> {
         val filters = mutableListOf<Set<Int>>()
+        val indexes = mutableListOf<List<Int>>()
         filterRequest.email?.let { (domain, lt, gt) ->
-            if (domain != null) filters.add(emailDomainIndex[domain] ?: emptySet())
+            if (domain != null) indexes.add(emailDomainIndex[domain] ?: emptyList())
             if (lt != null || gt != null) {
                 filters.add(getByEmailLtGt(lt, gt))
             }
         }
 
         filterRequest.fname?.let { (eq, any, _) ->
-            if (eq != null) filters.add(fnames[eq]?.let { fnameIndex[it] } ?: emptySet())
-            if (any != null) filters.add(any.flatMap { fnames[it]?.let { fnameIndex[it] } ?: emptySet<Int>() }.toSet())
+            if (eq != null) indexes.add(fnames[eq]?.let { fnameIndex[it] } ?: emptyList())
+            if (any != null) indexes.add(any.flatMap {
+                fnames[it]?.let { fnameIndex[it] } ?: emptyList<Int>()
+            }.sortedDescending())
         }
 
         filterRequest.sname?.let { (eq, starts, _) ->
             if (starts != null) {
-                filters.add(snames.filter { it.key.startsWith(starts) }.flatMap {
+                indexes.add(snames.filter { it.key.startsWith(starts) }.flatMap {
                     snameIndex[it.value] ?: emptyList<Int>()
-                }.toSet())
+                }.sortedDescending())
             }
-            if (eq != null) filters.add(snames[eq]?.let { snameIndex[it] } ?: emptySet())
+            if (eq != null) indexes.add(snames[eq]?.let { snameIndex[it] } ?: emptyList())
         }
 
         filterRequest.phone?.let { (eq, _) ->
-            if (eq != null) filters.add(phoneCodeIndex[eq.toInt()])
+            if (eq != null) indexes.add(phoneCodeIndex[eq.toInt()])
         }
 
         filterRequest.country?.let { (eq, _) ->
-            if (eq != null) filters.add(countries[eq]?.let { countryIndex[it] } ?: emptySet())
+            if (eq != null) indexes.add(countries[eq]?.let { countryIndex[it] } ?: emptyList())
         }
 
         filterRequest.city?.let { (eq, any, _) ->
-            if (eq != null) filters.add(cities[eq]?.let { cityIndex[it] } ?: emptySet())
-            if (any != null) filters.add(any.flatMap {
-                cities[it]?.let { cityIndex[it] } ?: emptySet<Int>()
-            }.toSet())
+            if (eq != null) indexes.add(cities[eq]?.let { cityIndex[it] } ?: emptyList())
+            if (any != null) indexes.add(any.flatMap {
+                cities[it]?.let { cityIndex[it] } ?: emptyList<Int>()
+            }.sortedDescending())
         }
 
         filterRequest.birth?.let { (lt, gt, year) ->
@@ -298,26 +300,27 @@ class AccountRepositoryImpl : AccountRepository {
 
         filterRequest.interests?.let { (contains, any) ->
             contains?.let { interests ->
-                interests.map { this.interests[it]?.let { interestIndex[it] } ?: emptyList<Int>() }
-                    .reduce { l, r -> l.intersect(r) }
-            }?.let { filters.add(it.toSet()) }
+                interests.asSequence().map { this.interests[it]?.let { interestIndex[it] } ?: emptyList<Int>() }
+                    .forEach { indexes.add(it) }
+            }
             any?.let { interests ->
                 interests.flatMap { this.interests[it]?.let { interestIndex[it] } ?: emptyList<Int>() }
-            }?.let { filters.add(it.toSet()) }
+            }?.let { indexes.add(it.sortedDescending()) }
         }
 
         filterRequest.likes?.let { (contains) ->
             contains?.let { likes ->
-                likes.map { getLikesByIndex(it) as Collection<Int> }.reduce { acc, list -> acc.intersect(list) }
-            }?.let { filters.add(it.toSet()) }
+                likes.asSequence().map { getLikesByIndex(it) }.forEach { indexes.add(it) }
+            }
         }
 
-        if (filters.any { it.isEmpty() }) {
+        if (filters.any { it.isEmpty() } || indexes.any { it.isEmpty() }) {
             return emptyList()
         }
 
-        return ids
-            .asSequence()
+        val sequence = if (indexes.isEmpty()) ids.asSequence() else generateSequenceFromIndexes(indexes)
+
+        return sequence
             .mapNotNull { getAccountByIndex(it) }
             .filter { id ->
                 filterByNull(filterRequest.fname?.nill, id.fname) &&
@@ -374,23 +377,23 @@ class AccountRepositoryImpl : AccountRepository {
             .toList()
     }
 
+
     override fun group(groupRequest: GroupRequest): List<Group> {
         val filters = mutableListOf<Set<Int>>()
+        val indexes = mutableListOf<List<Int>>()
 
-        groupRequest.sname?.let { snames[it]?.let { snameIndex[it] } ?: emptySet<Int>() }?.let { filters.add(it) }
-        groupRequest.fname?.let { fnames[it]?.let { fnameIndex[it] } ?: emptySet<Int>() }?.let { filters.add(it) }
-        groupRequest.sex?.let { sexIndex[it] }?.let { filters.add(it) }
+        groupRequest.sname?.let { snames[it] }?.let { snameIndex[it] }?.let { indexes.add(it) }
+        groupRequest.fname?.let { fnames[it] }?.let { fnameIndex[it] }?.let { indexes.add(it) }
+        groupRequest.sex?.let { sexIndex[it] }?.let { indexes.add(it) }
 
-        groupRequest.country?.let { countries[it]?.let { countryIndex[it] } ?: emptySet<Int>() }
-            ?.let { filters.add(it) }
-        groupRequest.city?.let { cities[it]?.let { cityIndex[it] } ?: emptySet<Int>() }?.let { filters.add(it) }
-        groupRequest.status?.let { statuses[it]?.let { statusIndex[it] } ?: emptySet<Int>() }?.let { filters.add(it) }
-        groupRequest.interests?.let { interests[it]?.let { interestIndex[it] } ?: emptySet<Int>() }
-            ?.let { filters.add(it) }
+        groupRequest.country?.let { countries[it]?.let { countryIndex[it] } }?.let { indexes.add(it) }
+        groupRequest.city?.let { cities[it]?.let { cityIndex[it] } }?.let { indexes.add(it) }
+        groupRequest.status?.let { statuses[it] }?.let { statusIndex[it] }?.let { indexes.add(it) }
+        groupRequest.interests?.let { interests[it] }?.let { interestIndex[it] }?.let { indexes.add(it) }
 
         groupRequest.birthYear?.let { queryByYear(it, birthIndex) }?.let { filters.add(it.toSet()) }
         groupRequest.joinedYear?.let { queryComplexByYear(it, joinedIndex) }?.let { filters.add(it.toSet()) }
-        groupRequest.likes?.let { getLikesByIndex(it).toSet() }?.let { filters.add(it) }
+        groupRequest.likes?.let { getLikesByIndex(it) }?.let { indexes.add(it) }
 
         data class GroupTemp(val sex: Int?, val status: Int?, val interest: Int?, val country: Int?, val city: Int?)
 
@@ -402,7 +405,9 @@ class AccountRepositoryImpl : AccountRepository {
 
         val listWithNull = listOf(null)
 
-        val tempGroups = ids.asSequence()
+        val sequence = if (indexes.isEmpty()) ids.asSequence() else generateSequenceFromIndexes(indexes)
+
+        val tempGroups = sequence
             .filter { id -> filters.none { !it.contains(id) } }
             .mapNotNull { getAccountByIndex(it) }
             .flatMap { acc ->
@@ -502,7 +507,7 @@ class AccountRepositoryImpl : AccountRepository {
 
     private fun withLockById(id: Int, block: () -> Unit) = synchronized(id) { block() }
 
-    private fun getLikesByIndex(likeId: Int): MutableCollection<Int> =
+    private fun getLikesByIndex(likeId: Int): ArrayList<Int> =
         when {
             likeId < 250_000 -> likeIndex0_250[likeId]
             likeId in 250_000 until 500_000 -> likeIndex250_500[likeId - 250_000]
@@ -586,4 +591,33 @@ class AccountRepositoryImpl : AccountRepository {
         else -> throw RuntimeException("Unknown char $char")
     }
 
+    private fun addToSortedCollection(list: ArrayList<Int>, id: Int?) {
+        synchronized(list) {
+            val closest = searchClosest(id!!, list)
+
+            list.add(closest, id!!)
+        }
+    }
+
+    private fun searchClosest(target: Int, nums: ArrayList<Int>): Int {
+        var i = 0
+        var j = nums.size - 1
+
+        while (i <= j) {
+            var mid =(i + j) / 2
+
+            if (target > nums[mid]) {
+                i = mid + 1
+            } else if (target < nums[mid]) {
+                j = mid - 1
+            } else {
+                return mid
+            }
+        }
+
+        return i
+    }
+
 }
+
+
