@@ -13,6 +13,8 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
+import kotlin.collections.HashSet
 import kotlin.concurrent.fixedRateTimer
 
 interface AccountRepository {
@@ -30,9 +32,9 @@ class AccountRepositoryImpl : AccountRepository {
     private val accounts1000_1300 = Array<InnerAccount?>(300_000) { null }
     private val accounts1300 = ConcurrentHashMap<Int, InnerAccount>(100_000)
 
-    private val statusIndex = ConcurrentHashMap<Int, MutableSet<Int>>()
+    private val statusIndex = HashMap<Int, MutableSet<Int>>()
 
-    private val sexIndex = ConcurrentHashMap<Char, MutableSet<Int>>()
+    private val sexIndex = HashMap<Char, MutableSet<Int>>()
 
     private val fnameIndex = ConcurrentHashMap<Int, MutableSet<Int>>()
     private val fnameNullIndex = concurrentHashSet<Int>()
@@ -43,7 +45,7 @@ class AccountRepositoryImpl : AccountRepository {
     private val emailDomainIndex = ConcurrentHashMap<String, MutableSet<Int>>()
     private val emailIndex = Array<AirConcurrentMap<String, Int>>(36) { AirConcurrentMap() }
 
-    private val phoneCodeIndex = ConcurrentHashMap<String, MutableSet<Int>>()
+    private val phoneCodeIndex = Array<MutableSet<Int>>(1000) { HashSet() }
     private val phoneNullIndex = concurrentHashSet<Int>()
 
     private val countryIndex = ConcurrentHashMap<Int, MutableSet<Int>>()
@@ -167,8 +169,11 @@ class AccountRepositoryImpl : AccountRepository {
             measureTimeAndReturnResult("phone index:") {
                 account.phone?.let { phone ->
                     val code = parsePhoneCode(phone)
-                    val codeCollection = phoneCodeIndex.computeIfAbsent(code) { concurrentHashSet() }
-                    codeCollection.add(account.id)
+                    val codeCollection = phoneCodeIndex[code.toInt()]
+                    synchronized(codeCollection) {
+                        codeCollection.add(account.id)
+                    }
+
                 } ?: phoneNullIndex.add(account.id)
             }
 
@@ -275,7 +280,7 @@ class AccountRepositoryImpl : AccountRepository {
         }
 
         filterRequest.phone?.let { (eq, _) ->
-            if (eq != null) filters.add(phoneCodeIndex[eq] ?: emptySet())
+            if (eq != null) filters.add(phoneCodeIndex[eq.toInt()])
         }
 
         filterRequest.country?.let { (eq, _) ->

@@ -25,6 +25,9 @@ fun parsePhoneCode(phone: String): String {
 
 fun <K> concurrentHashSet(capacity: Int = 16): MutableSet<K> = ConcurrentHashMap.newKeySet(capacity)
 
+fun <K> emptyMutableSet() : MutableSet<K> = mutableSet as MutableSet<K>
+val mutableSet = mutableSetOf<Nothing>()
+
 fun now() = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
 
 fun <T> customIntersects(
