@@ -3,10 +3,7 @@ package com.shaad.highload2018.repository
 import com.infinitydb.map.air.AirConcurrentMap
 import com.shaad.highload2018.domain.Account
 import com.shaad.highload2018.domain.InnerAccount
-import com.shaad.highload2018.utils.CompositeSet
-import com.shaad.highload2018.utils.generateSequenceFromIndexes
-import com.shaad.highload2018.utils.measureTimeAndReturnResult
-import com.shaad.highload2018.utils.parsePhoneCode
+import com.shaad.highload2018.utils.*
 import com.shaad.highload2018.web.get.FilterRequest
 import com.shaad.highload2018.web.get.Group
 import com.shaad.highload2018.web.get.GroupRequest
@@ -167,10 +164,7 @@ class AccountRepositoryImpl : AccountRepository {
                 account.phone?.let { phone ->
                     val code = parsePhoneCode(phone)
                     val codeCollection = phoneCodeIndex[code.toInt()]
-                    synchronized(codeCollection) {
-                        codeCollection.add(account.id)
-                    }
-
+                    addToSortedCollection(codeCollection, account.id)
                 }
             }
 
@@ -202,7 +196,7 @@ class AccountRepositoryImpl : AccountRepository {
             measureTimeAndReturnResult("interest index:") {
                 (account.interests ?: emptyList()).forEach {
                     val collection = interestIndex.computeIfAbsent(interests[it]!!) { ArrayList(15_000) }
-                    collection.add(account.id)
+                    addToSortedCollection(collection, account.id)
                 }
             }
 
@@ -248,43 +242,43 @@ class AccountRepositoryImpl : AccountRepository {
 
     override fun filter(filterRequest: FilterRequest): List<MutableMap<String, Any?>> {
         val filters = mutableListOf<Set<Int>>()
-        val indexes = mutableListOf<List<Int>>()
+        val indexes = mutableListOf<Iterator<Int>>()
         filterRequest.email?.let { (domain, lt, gt) ->
-            if (domain != null) indexes.add(emailDomainIndex[domain] ?: emptyList())
+            if (domain != null) indexes.add(emailDomainIndex[domain]?.iterator() ?: emptyIterator())
             if (lt != null || gt != null) {
                 filters.add(getByEmailLtGt(lt, gt))
             }
         }
 
         filterRequest.fname?.let { (eq, any, _) ->
-            if (eq != null) indexes.add(fnames[eq]?.let { fnameIndex[it] } ?: emptyList())
-            if (any != null) indexes.add(any.flatMap {
-                fnames[it]?.let { fnameIndex[it] } ?: emptyList<Int>()
-            }.sortedDescending())
+            if (eq != null) indexes.add(fnames[eq]?.let { fnameIndex[it]?.iterator() } ?: emptyIterator())
+            if (any != null) indexes.add(any.map {
+                (fnames[it]?.let { fnameIndex[it]?.iterator() } ?: emptyIterator())
+            }.let { joinSequences(it).iterator() })
         }
 
         filterRequest.sname?.let { (eq, starts, _) ->
             if (starts != null) {
-                indexes.add(snames.filter { it.key.startsWith(starts) }.flatMap {
-                    snameIndex[it.value] ?: emptyList<Int>()
-                }.sortedDescending())
+                indexes.add(snames.filter { it.key.startsWith(starts) }.map {
+                    snameIndex[it.value]?.iterator() ?: emptyIterator()
+                }.let { joinSequences(it).iterator() })
             }
-            if (eq != null) indexes.add(snames[eq]?.let { snameIndex[it] } ?: emptyList())
+            if (eq != null) indexes.add(snames[eq]?.let { snameIndex[it]?.iterator() } ?: emptyIterator())
         }
 
         filterRequest.phone?.let { (eq, _) ->
-            if (eq != null) indexes.add(phoneCodeIndex[eq.toInt()])
+            if (eq != null) indexes.add(phoneCodeIndex[eq.toInt()].iterator())
         }
 
         filterRequest.country?.let { (eq, _) ->
-            if (eq != null) indexes.add(countries[eq]?.let { countryIndex[it] } ?: emptyList())
+            if (eq != null) indexes.add(countries[eq]?.let { countryIndex[it]?.iterator() } ?: emptyIterator())
         }
 
         filterRequest.city?.let { (eq, any, _) ->
-            if (eq != null) indexes.add(cities[eq]?.let { cityIndex[it] } ?: emptyList())
-            if (any != null) indexes.add(any.flatMap {
-                cities[it]?.let { cityIndex[it] } ?: emptyList<Int>()
-            }.sortedDescending())
+            if (eq != null) indexes.add(cities[eq]?.let { cityIndex[it]?.iterator() } ?: emptyIterator())
+            if (any != null) indexes.add(any.map {
+                cities[it]?.let { cityIndex[it]?.iterator() } ?: emptyIterator()
+            }.let { joinSequences(it).iterator() })
         }
 
         filterRequest.birth?.let { (lt, gt, year) ->
@@ -300,21 +294,22 @@ class AccountRepositoryImpl : AccountRepository {
 
         filterRequest.interests?.let { (contains, any) ->
             contains?.let { interests ->
-                interests.asSequence().map { this.interests[it]?.let { interestIndex[it] } ?: emptyList<Int>() }
+                interests.asSequence()
+                    .map { this.interests[it]?.let { interestIndex[it]?.iterator() } ?: emptyIterator() }
                     .forEach { indexes.add(it) }
             }
             any?.let { interests ->
-                interests.flatMap { this.interests[it]?.let { interestIndex[it] } ?: emptyList<Int>() }
-            }?.let { indexes.add(it.sortedDescending()) }
+                interests.map { this.interests[it]?.let { interestIndex[it]?.iterator() } ?: emptyIterator() }
+            }?.let { indexes.add(joinSequences(it).iterator()) }
         }
 
         filterRequest.likes?.let { (contains) ->
             contains?.let { likes ->
-                likes.asSequence().map { getLikesByIndex(it) }.forEach { indexes.add(it) }
+                likes.asSequence().map { getLikesByIndex(it) }.forEach { indexes.add(it.iterator()) }
             }
         }
 
-        if (filters.any { it.isEmpty() } || indexes.any { it.isEmpty() }) {
+        if (filters.any { it.isEmpty() }) {
             return emptyList()
         }
 
@@ -334,7 +329,7 @@ class AccountRepositoryImpl : AccountRepository {
             .filter { acc ->
                 filterRequest.premium?.let { (now, _) ->
                     if (now != null) acc.premium?.let {
-                        System.currentTimeMillis() in (it.start..it.finish)
+                        System.currentTimeMillis() / 1000 in (it.start..it.finish)
                     } == true else true
                 } ?: true
             }
@@ -361,7 +356,7 @@ class AccountRepositoryImpl : AccountRepository {
                     resultObj["sname"] = innerAccount.sname?.let { snamesInv[it] }
                 }
                 filterRequest.phone?.let {
-                    resultObj["phone"] = innerAccount.id
+                    resultObj["phone"] = innerAccount.phone
                 }
                 filterRequest.country?.let {
                     resultObj["country"] = innerAccount.country?.let { countriesInv[it] }
@@ -380,20 +375,20 @@ class AccountRepositoryImpl : AccountRepository {
 
     override fun group(groupRequest: GroupRequest): List<Group> {
         val filters = mutableListOf<Set<Int>>()
-        val indexes = mutableListOf<List<Int>>()
+        val indexes = mutableListOf<Iterator<Int>>()
 
-        groupRequest.sname?.let { snames[it] }?.let { snameIndex[it] }?.let { indexes.add(it) }
-        groupRequest.fname?.let { fnames[it] }?.let { fnameIndex[it] }?.let { indexes.add(it) }
-        groupRequest.sex?.let { sexIndex[it] }?.let { indexes.add(it) }
+        groupRequest.sname?.let { snames[it] }?.let { snameIndex[it] }?.let { indexes.add(it.iterator()) }
+        groupRequest.fname?.let { fnames[it] }?.let { fnameIndex[it] }?.let { indexes.add(it.iterator()) }
+        groupRequest.sex?.let { sexIndex[it] }?.let { indexes.add(it.iterator()) }
 
-        groupRequest.country?.let { countries[it]?.let { countryIndex[it] } }?.let { indexes.add(it) }
-        groupRequest.city?.let { cities[it]?.let { cityIndex[it] } }?.let { indexes.add(it) }
-        groupRequest.status?.let { statuses[it] }?.let { statusIndex[it] }?.let { indexes.add(it) }
-        groupRequest.interests?.let { interests[it] }?.let { interestIndex[it] }?.let { indexes.add(it) }
+        groupRequest.country?.let { countries[it]?.let { countryIndex[it] } }?.let { indexes.add(it.iterator()) }
+        groupRequest.city?.let { cities[it]?.let { cityIndex[it] } }?.let { indexes.add(it.iterator()) }
+        groupRequest.status?.let { statuses[it] }?.let { statusIndex[it] }?.let { indexes.add(it.iterator()) }
+        groupRequest.interests?.let { interests[it] }?.let { interestIndex[it] }?.let { indexes.add(it.iterator()) }
 
         groupRequest.birthYear?.let { queryByYear(it, birthIndex) }?.let { filters.add(it.toSet()) }
         groupRequest.joinedYear?.let { queryComplexByYear(it, joinedIndex) }?.let { filters.add(it.toSet()) }
-        groupRequest.likes?.let { getLikesByIndex(it) }?.let { indexes.add(it) }
+        groupRequest.likes?.let { getLikesByIndex(it) }?.let { indexes.add(it.iterator()) }
 
         data class GroupTemp(val sex: Int?, val status: Int?, val interest: Int?, val country: Int?, val city: Int?)
 
@@ -595,7 +590,7 @@ class AccountRepositoryImpl : AccountRepository {
         synchronized(list) {
             val closest = searchClosest(id!!, list)
 
-            list.add(closest, id!!)
+            list.add(closest, id)
         }
     }
 
@@ -604,11 +599,11 @@ class AccountRepositoryImpl : AccountRepository {
         var j = nums.size - 1
 
         while (i <= j) {
-            var mid =(i + j) / 2
+            val mid = (i + j) / 2
 
-            if (target > nums[mid]) {
+            if (target < nums[mid]) {
                 i = mid + 1
-            } else if (target < nums[mid]) {
+            } else if (target > nums[mid]) {
                 j = mid - 1
             } else {
                 return mid

@@ -89,38 +89,85 @@ class CompositeSet(private val sets: Collection<Set<Int>>) : Set<Int> {
     override fun contains(element: Int): Boolean = sets.any { it.contains(element) }
 }
 
-fun generateSequenceFromIndexes(indexes: MutableList<List<Int>>): Sequence<Int> {
-    return sequence {
-        val counters = Array(indexes.size) { 0 }
-        val currentVal = Array<Int?>(indexes.size) { null }
-        while (true) {
-            (0 until indexes.size).forEach { i ->
-                currentVal[i] = indexes[i].getOrNull(counters[i])
-            }
-            var allEqual = true
-            var idToYield = -1
-            (0 until indexes.size).forEach { i ->
-                val c = currentVal[i] ?: return@sequence
-                if (idToYield == -1) {
-                    idToYield = c
-                } else {
-                    allEqual = false
-                    if (idToYield < c) {
-                        idToYield = c
-                    }
-                }
-            }
-            if (allEqual) {
-                yield(idToYield)
-                counters.forEachIndexed{ i ,_ -> counters[i]++ }
-            } else {
-                counters.forEachIndexed{ i ,_ ->
-                    if (currentVal[i]!! >= idToYield) {
-                        counters[i]++
-                    }
-                }
+object EmptyIterator : Iterator<Nothing> {
+    override fun hasNext() = false
+
+    override fun next(): Nothing {
+        TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+    }
+}
+
+fun emptyIterator() = EmptyIterator
+
+fun joinSequences(indexes: List<Iterator<Int>>) = sequence {
+    val range = (0 until indexes.size)
+    val currentVal = Array<Int?>(indexes.size) { null }
+    range.forEach { i ->
+        if (!indexes[i].hasNext()) {
+            return@sequence
+        }
+        currentVal[i] = indexes[i].next()
+    }
+    while (true) {
+        val maxValue = currentVal.maxBy { it!! }!!
+        yield(maxValue)
+        range.forEach { it ->
+            if (currentVal[it] == maxValue) {
+                currentVal[it] = if (!indexes[it].hasNext()) {
+                    return@sequence
+                } else indexes[it].next()
             }
         }
     }
 }
 
+
+fun generateSequenceFromIndexes(indexes: List<Iterator<Int>>): Sequence<Int> = sequence {
+    val range = (0 until indexes.size)
+    val currentVal = Array<Int?>(indexes.size) { null }
+    range.forEach { i ->
+        if (!indexes[i].hasNext()) {
+            return@sequence
+        }
+        currentVal[i] = indexes[i].next()
+    }
+
+    while (true) {
+        var allEqual = true
+        var id2Yield = -1
+        (0 until indexes.size).forEach { i ->
+            val c = currentVal[i]!!
+            if (id2Yield == -1) {
+                id2Yield = c
+            } else {
+                if (id2Yield != c) {
+                    allEqual = false
+                }
+                if (id2Yield > c) {
+                    id2Yield = c
+                }
+            }
+        }
+        if (allEqual) {
+            yield(id2Yield)
+            range.forEach { i ->
+                if (!indexes[i].hasNext()) {
+                    return@sequence
+                }
+                currentVal[i] = indexes[i].next()
+            }
+        } else {
+            range.forEach { i ->
+                if (currentVal[i]!! >= id2Yield) {
+                    while (currentVal[i]!! > id2Yield) {
+                        if (!indexes[i].hasNext()) {
+                            return@sequence
+                        }
+                        currentVal[i] = indexes[i].next()
+                    }
+
+                }
+            }
+        }
+    }
+}
