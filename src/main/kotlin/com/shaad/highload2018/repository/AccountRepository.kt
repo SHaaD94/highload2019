@@ -7,11 +7,8 @@ import com.shaad.highload2018.web.get.FilterRequest
 import com.shaad.highload2018.web.get.Group
 import com.shaad.highload2018.web.get.GroupRequest
 import java.time.LocalDateTime
-import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.collections.ArrayList
-import kotlin.collections.HashMap
 import kotlin.concurrent.fixedRateTimer
 
 interface AccountRepository {
@@ -29,28 +26,28 @@ class AccountRepositoryImpl : AccountRepository {
     private val accounts1000_1300 = Array<InnerAccount?>(300_000) { null }
     private val accounts1300 = ConcurrentHashMap<Int, InnerAccount>(100_000)
 
-    private val statusIndex = HashMap<Int, ArrayList<Int>>()
+    private val statusIndex = ConcurrentHashMap<Int, Array<ArrayList<Int>>>()
 
-    private val sexIndex = HashMap<Char, ArrayList<Int>>()
+    private val sexIndex = ConcurrentHashMap<Char, Array<ArrayList<Int>>>()
 
-    private val fnameIndex = ConcurrentHashMap<Int, ArrayList<Int>>()
+    private val fnameIndex = ConcurrentHashMap<Int, Array<ArrayList<Int>>>()
 
-    private val snameIndex = ConcurrentHashMap<Int, ArrayList<Int>>()
+    private val snameIndex = ConcurrentHashMap<Int, Array<ArrayList<Int>>>()
 
-    private val emailDomainIndex = ConcurrentHashMap<String, ArrayList<Int>>()
+    private val emailDomainIndex = ConcurrentHashMap<String, Array<ArrayList<Int>>>()
     private val emailIndex = Array(36) { ConcurrentHashMap<String, Int>() }
 
-    private val phoneCodeIndex = Array<ArrayList<Int>>(1000) { ArrayList() }
+    private val phoneCodeIndex = Array(1000) { Array(20) { ArrayList<Int>() } }
 
-    private val countryIndex = ConcurrentHashMap<Int, ArrayList<Int>>()
+    private val countryIndex = ConcurrentHashMap<Int, Array<ArrayList<Int>>>()
 
-    private val cityIndex = ConcurrentHashMap<Int, ArrayList<Int>>()
+    private val cityIndex = ConcurrentHashMap<Int, Array<ArrayList<Int>>>()
 
-    private val birthIndex = Array(100) { ArrayList<Int>() }
+    private val birthIndex = Array(100) { Array(20) { ArrayList<Int>() } }
 
-    private val joinedIndex = Array(10) { ArrayList<Int>() }
+    private val joinedIndex = Array(10) { Array(20) { ArrayList<Int>() } }
 
-    private val interestIndex = ConcurrentHashMap<Int, ArrayList<Int>>()
+    private val interestIndex = ConcurrentHashMap<Int, Array<ArrayList<Int>>>()
 
     private val likeIndex0_250 = Array<ArrayList<Int>>(250_000) { ArrayList() }
     private val likeIndex250_500 = Array<ArrayList<Int>>(250_000) { ArrayList() }
@@ -124,34 +121,35 @@ class AccountRepositoryImpl : AccountRepository {
             }
 
             measureTimeAndReturnResult("sex index:") {
-                val collection = sexIndex.computeIfAbsent(account.sex) { ArrayList() }
-                addToSortedCollection(collection, account.id)
+                val collection = sexIndex.computeIfAbsent(account.sex) { Array(20) { ArrayList<Int>() } }
+                addToSortedCollection(getIdBucket(account.id, collection), account.id)
             }
 
             measureTimeAndReturnResult("status index:") {
-                val collection = statusIndex.computeIfAbsent(statuses[account.status]!!) { ArrayList() }
-                addToSortedCollection(collection, account.id)
+                val collection =
+                    statusIndex.computeIfAbsent(statuses[account.status]!!) { Array(20) { ArrayList<Int>() } }
+                addToSortedCollection(getIdBucket(account.id, collection), account.id)
             }
 
             measureTimeAndReturnResult("fname index:") {
                 account.fname?.let {
-                    val collection = fnameIndex.computeIfAbsent(fnames[it]!!) { ArrayList() }
-                    addToSortedCollection(collection, account.id)
+                    val collection = fnameIndex.computeIfAbsent(fnames[it]!!) { Array(20) { ArrayList<Int>() } }
+                    addToSortedCollection(getIdBucket(account.id, collection), account.id)
                 }
             }
 
             measureTimeAndReturnResult("sname index:") {
                 account.sname?.let {
-                    val collection = snameIndex.computeIfAbsent(snames[it]!!) { ArrayList() }
-                    addToSortedCollection(collection, account.id)
+                    val collection = snameIndex.computeIfAbsent(snames[it]!!) { Array(20) { ArrayList<Int>() } }
+                    addToSortedCollection(getIdBucket(account.id, collection), account.id)
                 }
             }
 
             account.email.let { email ->
                 measureTimeAndReturnResult("email domain index:") {
                     val domain = email.split("@").let { parsedEmail -> parsedEmail[parsedEmail.size - 1] }
-                    val collection = emailDomainIndex.computeIfAbsent(domain) { ArrayList() }
-                    addToSortedCollection(collection, account.id)
+                    val collection = emailDomainIndex.computeIfAbsent(domain) { Array(20) { ArrayList<Int>() } }
+                    addToSortedCollection(getIdBucket(account.id, collection), account.id)
                 }
                 measureTimeAndReturnResult("email index:") {
                     addEmailToIndex(email, account.id)
@@ -161,37 +159,39 @@ class AccountRepositoryImpl : AccountRepository {
             measureTimeAndReturnResult("phone index:") {
                 account.phone?.let { phone ->
                     val code = parsePhoneCode(phone)
-                    val codeCollection = phoneCodeIndex[code.toInt()]
-                    addToSortedCollection(codeCollection, account.id)
+                    val collection = phoneCodeIndex[code.toInt()]
+                    addToSortedCollection(getIdBucket(account.id, collection), account.id)
                 }
             }
 
             measureTimeAndReturnResult("country index:") {
                 account.country?.let {
-                    val collection = countryIndex.computeIfAbsent(countries[it]!!) { ArrayList() }
-                    addToSortedCollection(collection, account.id)
+                    val collection = countryIndex.computeIfAbsent(countries[it]!!) { Array(20) { ArrayList<Int>() } }
+                    addToSortedCollection(getIdBucket(account.id, collection), account.id)
                 }
             }
 
             measureTimeAndReturnResult("city index:") {
                 account.city?.let {
-                    val collection = cityIndex.computeIfAbsent(cities[it]!!) { ArrayList() }
-                    addToSortedCollection(collection, account.id)
+                    val collection = cityIndex.computeIfAbsent(cities[it]!!) { Array(20) { ArrayList<Int>() } }
+                    addToSortedCollection(getIdBucket(account.id, collection), account.id)
                 }
             }
 
             measureTimeAndReturnResult("birth index:") {
-                addToSortedCollection(birthIndex[getYear(account.birth) - 1920], account.id)
+                val collection = birthIndex[getYear(account.birth) - 1920]
+                addToSortedCollection(getIdBucket(account.id, collection), account.id)
             }
 
             measureTimeAndReturnResult("joined index:") {
-                addToSortedCollection(joinedIndex[getYear(account.joined) - 2010], account.id)
+                val collection = joinedIndex[getYear(account.joined) - 2010]
+                addToSortedCollection(getIdBucket(account.id, collection), account.id)
             }
 
             measureTimeAndReturnResult("interest index:") {
                 (account.interests ?: emptyList()).forEach {
-                    val collection = interestIndex.computeIfAbsent(interests[it]!!) { ArrayList(15_000) }
-                    addToSortedCollection(collection, account.id)
+                    val collection = interestIndex.computeIfAbsent(interests[it]!!) { Array(20) { ArrayList<Int>() } }
+                    addToSortedCollection(getIdBucket(account.id, collection), account.id)
                 }
             }
 
@@ -238,75 +238,99 @@ class AccountRepositoryImpl : AccountRepository {
     override fun filter(filterRequest: FilterRequest): List<MutableMap<String, Any?>> {
         val indexes = mutableListOf<Iterator<Int>>()
         filterRequest.email?.let { (domain, lt, gt) ->
-            if (domain != null) indexes.add(emailDomainIndex[domain]?.iterator() ?: emptyIterator())
+            if (domain != null) indexes.add(getIterator(emailDomainIndex[domain]))
+        }
+        filterRequest.sex?.let { (eq) ->
+            indexes.add(getIterator(sexIndex[eq]))
+        }
+        filterRequest.status?.let { (eq, neq) ->
+            if (eq != null) {
+                indexes.add(getIterator(statusIndex[statuses[eq]]))
+            }
+            if (neq != null) {
+                statuses.keys().asSequence().filter { it != neq }.map { statuses[it]!! }
+                    .map { getIterator(statusIndex[it]!!) }
+                    .toList()
+                    .let { indexes.add(joinIterators(it)) }
+            }
         }
 
         filterRequest.fname?.let { (eq, any, _) ->
-            if (eq != null) indexes.add(fnames[eq]?.let { fnameIndex[it]?.iterator() } ?: emptyIterator())
+            if (eq != null) indexes.add(getIterator(fnames[eq]?.let { fnameIndex[it] }))
             if (any != null) indexes.add(any.map {
-                (fnames[it]?.let { fnameIndex[it]?.iterator() } ?: emptyIterator())
-            }.let { joinSequences(it) })
+                getIterator(fnames[it]?.let { fnameIndex[it] })
+            }.let { joinIterators(it) })
         }
 
         filterRequest.sname?.let { (eq, starts, _) ->
             if (starts != null) {
                 indexes.add(snames.filter { it.key.startsWith(starts) }.map {
-                    snameIndex[it.value]?.iterator() ?: emptyIterator()
-                }.let { joinSequences(it) })
+                    getIterator(snameIndex[it.value])
+                }.let { joinIterators(it) })
             }
-            if (eq != null) indexes.add(snames[eq]?.let { snameIndex[it]?.iterator() } ?: emptyIterator())
+            if (eq != null) indexes.add(getIterator(snames[eq]?.let { snameIndex[it] }))
         }
 
         filterRequest.phone?.let { (eq, _) ->
-            if (eq != null) indexes.add(phoneCodeIndex[eq.toInt()].iterator())
+            if (eq != null) indexes.add(getIterator(phoneCodeIndex[eq.toInt()]))
         }
 
         filterRequest.country?.let { (eq, _) ->
-            if (eq != null) indexes.add(countries[eq]?.let { countryIndex[it]?.iterator() } ?: emptyIterator())
+            if (eq != null) indexes.add(getIterator(countries[eq]?.let { countryIndex[it] }))
         }
 
         filterRequest.city?.let { (eq, any, _) ->
-            if (eq != null) indexes.add(cities[eq]?.let { cityIndex[it]?.iterator() } ?: emptyIterator())
+            if (eq != null) indexes.add(getIterator(cities[eq]?.let { cityIndex[it] }))
             if (any != null) indexes.add(any.map {
-                cities[it]?.let { cityIndex[it]?.iterator() } ?: emptyIterator()
-            }.let { joinSequences(it) })
+                getIterator(cities[it]?.let { cityIndex[it] })
+            }.let { joinIterators(it) })
         }
 
         filterRequest.birth?.let { (lt, gt, year) ->
-            // from 01.01.1950 to 01.01.2005
+            if (lt != null || gt != null) {
+                val ltY = checkBirthYear(lt?.let { getYear(lt) - 1920 } ?: 99)
+                val gtY = checkBirthYear(gt?.let { getYear(gt) - 1920 } ?: 0)
 
-            val ltY = checkBirthYear(lt?.let { getYear(lt) - 1920 } ?: 99)
-            val gtY = checkBirthYear(gt?.let { getYear(gt) - 1920 } ?: 0)
 
-            (gtY + 1 until ltY - 1).map { birthIndex[it].iterator() }
-                .plusElement(
-                    if (lt == null) birthIndex[ltY].iterator() else {
-                        birthIndex[ltY].asSequence().filter { getAccountByIndex(it)!!.birth <= lt }.iterator()
-                    }
-                )
-                .plusElement(
-                    if (gt == null) birthIndex[gtY].iterator() else {
-                        birthIndex[gtY].asSequence().filter { getAccountByIndex(it)!!.birth >= gt }.iterator()
-                    }
-                ).let { indexes.add(joinSequences(it)) }
+                val iterators = (gtY + 1 until ltY).asSequence()
+                    .map { birthIndex[it] }
+                    .filter { it.any { !it.isEmpty() } }
+                    .map { getIterator(it) }
+                    .toMutableList()
+                if (birthIndex[ltY].any { !it.isEmpty() }) {
+                    val iter = getIterator(birthIndex[ltY])
+                    if (lt == null) iter else {
+                        iter.asSequence().filter { getAccountByIndex(it)!!.birth <= lt }
+                            .iterator()
+                    }.let { iterators.add(it) }
+                }
+                if (birthIndex[gtY].any { !it.isEmpty() }) {
+                    val iter = getIterator(birthIndex[gtY])
+                    if (gt == null) iter else {
+                        iter.asSequence().filter { getAccountByIndex(it)!!.birth >= gt }
+                            .iterator()
+                    }.let { iterators.add(it) }
+                }
+                indexes.add(joinIterators(iterators))
+            }
 
-            if (year != null) indexes.add(birthIndex[checkBirthYear(year) - 1920].iterator())
+            if (year != null) indexes.add(getIterator(birthIndex[checkBirthYear(year - 1920)]))
         }
 
         filterRequest.interests?.let { (contains, any) ->
             contains?.let { interests ->
                 interests.asSequence()
-                    .map { this.interests[it]?.let { interestIndex[it]?.iterator() } ?: emptyIterator() }
+                    .map { getIterator(this.interests[it]?.let { interestIndex[it] }) }
                     .forEach { indexes.add(it) }
             }
             any?.let { interests ->
-                interests.map { this.interests[it]?.let { interestIndex[it]?.iterator() } ?: emptyIterator() }
-            }?.let { indexes.add(joinSequences(it)) }
+                interests.map { getIterator(this.interests[it]?.let { interestIndex[it] }) }
+            }?.let { indexes.add(joinIterators(it)) }
         }
 
         filterRequest.likes?.let { (contains) ->
             contains?.let { likes ->
-                likes.asSequence().map { getLikesByIndex(it) }.forEach { indexes.add(it.iterator()) }
+                likes.asSequence().map { getLikesByIndex(it).iterator() }.forEach { indexes.add(it) }
             }
         }
 
@@ -339,14 +363,6 @@ class AccountRepositoryImpl : AccountRepository {
                     if (now != null) acc.premium?.let {
                         System.currentTimeMillis() / 1000 in (it.start..it.finish)
                     } == true else true
-                } ?: true
-            }
-            .filter { acc -> if (filterRequest.sex != null) int2Sex(acc.sex) == filterRequest.sex.eq else true }
-            .filter { acc ->
-                filterRequest.status?.let { (eq, neq) ->
-                    val eqDecision = eq?.let { statuses[it] == acc.status } ?: true
-                    val neqDecision = neq?.let { statuses[it] != acc.status } ?: true
-                    neqDecision && eqDecision
                 } ?: true
             }
             .take(filterRequest.limit)
@@ -383,16 +399,20 @@ class AccountRepositoryImpl : AccountRepository {
     override fun group(groupRequest: GroupRequest): List<Group> {
         val indexes = mutableListOf<Iterator<Int>>()
 
-        groupRequest.sname?.let { snames[it] }?.let { snameIndex[it] }?.let { indexes.add(it.iterator()) }
-        groupRequest.fname?.let { fnames[it] }?.let { fnameIndex[it] }?.let { indexes.add(it.iterator()) }
-        groupRequest.sex?.let { sexIndex[it] }?.let { indexes.add(it.iterator()) }
+        groupRequest.sname?.let { snames[it] }?.let { snameIndex[it] }?.let { indexes.add(getIterator(it)) }
+        groupRequest.fname?.let { fnames[it] }?.let { fnameIndex[it] }?.let { indexes.add(getIterator(it)) }
+        groupRequest.sex?.let { sexIndex[it] }?.let { indexes.add(getIterator(it)) }
 
-        groupRequest.country?.let { countries[it]?.let { countryIndex[it] } }?.let { indexes.add(it.iterator()) }
-        groupRequest.city?.let { cities[it]?.let { cityIndex[it] } }?.let { indexes.add(it.iterator()) }
-        groupRequest.status?.let { statuses[it] }?.let { statusIndex[it] }?.let { indexes.add(it.iterator()) }
-        groupRequest.interests?.let { interests[it] }?.let { interestIndex[it] }?.let { indexes.add(it.iterator()) }
+        groupRequest.country?.let { countries[it]?.let { countryIndex[it] } }?.let { indexes.add(getIterator(it)) }
+        groupRequest.city?.let { cities[it]?.let { cityIndex[it] } }?.let { indexes.add(getIterator(it)) }
+        groupRequest.status?.let { statuses[it] }?.let { statusIndex[it] }?.let { indexes.add(getIterator(it)) }
+        groupRequest.interests?.let { interests[it] }?.let { interestIndex[it] }?.let { indexes.add(getIterator(it)) }
 
         groupRequest.birthYear?.let { year ->
+            val mappedYear = checkBirthYear(year - 1920)
+            birthIndex[mappedYear]
+        }?.let { indexes.add(getIterator(it)) }
+        groupRequest.joinedYear?.let { year ->
             val mappedYear = (year - 2010).let {
                 when {
                     it > 9 -> 9
@@ -400,9 +420,8 @@ class AccountRepositoryImpl : AccountRepository {
                     else -> it
                 }
             }
-            birthIndex[mappedYear]
-        }?.let { indexes.add(it.iterator()) }
-        groupRequest.joinedYear?.let { joinedIndex[it] }?.let { indexes.add(it.iterator()) }
+            joinedIndex[mappedYear]
+        }?.let { indexes.add(getIterator(it)) }
         groupRequest.likes?.let { getLikesByIndex(it) }?.let { indexes.add(it.iterator()) }
 
         data class GroupTemp(val sex: Int?, val status: Int?, val interest: Int?, val country: Int?, val city: Int?)
@@ -504,19 +523,6 @@ class AccountRepositoryImpl : AccountRepository {
         else -> null
     }
 
-    private fun queryByYear(year: Int, index: NavigableMap<Int, Int>): Collection<Int> {
-        val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(moscowTimeZone).toInt()
-        val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(moscowTimeZone).toInt() - 1
-        return index.subMap(from, true, to, true).values
-    }
-
-    private fun queryComplexByYear(year: Int, index: NavigableMap<Int, MutableCollection<Int>>): Collection<Int> {
-        val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(moscowTimeZone).toInt()
-        val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(moscowTimeZone).toInt() - 1
-        return index.subMap(from, true, to, true).flatMap { it.value }
-    }
-
-
     private fun filterByNull(nill: Boolean?, property: Any?) =
         if (nill != null) {
             when (nill) {
@@ -614,6 +620,39 @@ class AccountRepositoryImpl : AccountRepository {
         'z' -> 35
         else -> throw RuntimeException("Unknown char $char")
     }
+
+    private fun getIterator(array: Array<ArrayList<Int>>?): Iterator<Int> {
+        array ?: return emptyIterator()
+        val resultIterators = array.filter { !it.isEmpty() }.map { it.iterator() }
+        return if (resultIterators.isEmpty()) {
+            emptyIterator()
+        } else {
+            joinIterators(resultIterators)
+        }
+    }
+
+    private fun getIdBucket(id: Int, array: Array<ArrayList<Int>>): ArrayList<Int> = when {
+        id < 100_000 -> 0
+        id in 100_000 until 200_000 -> 1
+        id in 200_000 until 300_000 -> 2
+        id in 300_000 until 400_000 -> 3
+        id in 400_000 until 500_000 -> 4
+        id in 500_000 until 600_000 -> 5
+        id in 600_000 until 700_000 -> 6
+        id in 700_000 until 800_000 -> 7
+        id in 800_000 until 900_000 -> 8
+        id in 900_000 until 1000_000 -> 9
+        id in 1000_000 until 1100_000 -> 10
+        id in 1100_000 until 1200_000 -> 11
+        id in 1200_000 until 1300_000 -> 12
+        id in 1300_000 until 1400_000 -> 13
+        id in 1400_000 until 1500_000 -> 14
+        id in 1500_000 until 1600_000 -> 15
+        id in 1600_000 until 1700_000 -> 16
+        id in 1700_000 until 1800_000 -> 17
+        id in 1800_000 until 1900_000 -> 18
+        else -> 19
+    }.let { array[it] }
 
     private fun addToSortedCollection(list: ArrayList<Int>, id: Int?) {
         synchronized(list) {

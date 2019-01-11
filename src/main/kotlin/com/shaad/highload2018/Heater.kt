@@ -39,12 +39,20 @@ class Heater {
 
     private fun get(url: String) {
         Request.Builder().url(url).method("GET", null).build()
-            .let { client.newCall(it).execute().code() }
-            .let { if (it != 200) println("WARN code is not 200!!! $url ") }
+            .let {
+                client.newCall(it).execute().let {
+                    it.body().close()
+                    it.code()
+                }
+            }.let { if (it != 200) println("WARN code is not 200!!! $url ") }
     }
 
     private fun post(url: String) {
         Request.Builder().url(url).method("POST", RequestBody.create(MediaType.parse("application/json"), "{}")).build()
-            .let { client.newCall(it).execute().code() }
+            .let {
+                client.newCall(it).execute().let {
+                    it.body().close()
+                }
+            }
     }
 }

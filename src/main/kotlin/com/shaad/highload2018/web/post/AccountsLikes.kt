@@ -15,6 +15,6 @@ class AccountsLikes : HandlerBase() {
         BytesUtil.match(buf.bytes(), pathRange.start, path, true)
 
     override fun process(buf: Buf, pathRange: BufRange, paramsRange: BufRange, bodyRange: BufRange): HandlerAnswer {
-        return HandlerAnswer(200, emptyResponse)
+        return HandlerAnswer(202, emptyResponse)
     }
 }

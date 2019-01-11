@@ -7,15 +7,10 @@ import com.shaad.highload2018.utils.measureTimeAndReturnResult
 import com.shaad.highload2018.web.Server
 
 fun main(args: Array<String>) {
-    println(System.currentTimeMillis())
-    val injector = measureTimeAndReturnResult("Created injector in") {
-        Guice.createInjector(
-            Stage.PRODUCTION,
-            BaseModule()
-        )
-    }
-
-    Runtime.getRuntime().addShutdownHook(Thread { println("Killed at ${System.currentTimeMillis()}") })
+    val injector = Guice.createInjector(
+        Stage.PRODUCTION,
+        BaseModule()
+    )
 
     measureTimeAndReturnResult("Filling is finished in") {
         injector.getInstance(DataFiller::class.java).fill()

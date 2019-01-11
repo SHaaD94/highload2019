@@ -99,7 +99,7 @@ object EmptyIterator : Iterator<Nothing> {
 
 fun emptyIterator() = EmptyIterator
 
-fun joinSequences(indexes: List<Iterator<Int>>) = iterator {
+fun joinIterators(indexes: List<Iterator<Int>>) = iterator {
     val range = (0 until indexes.size)
     val currentVal = Array<Int?>(indexes.size) { null }
     range.forEach { i ->
