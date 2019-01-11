@@ -1,6 +1,5 @@
 package com.shaad.highload2018.repository
 
-import com.infinitydb.map.air.AirConcurrentMap
 import com.shaad.highload2018.domain.Account
 import com.shaad.highload2018.domain.InnerAccount
 import com.shaad.highload2018.utils.*
@@ -8,7 +7,6 @@ import com.shaad.highload2018.web.get.FilterRequest
 import com.shaad.highload2018.web.get.Group
 import com.shaad.highload2018.web.get.GroupRequest
 import java.time.LocalDateTime
-import java.time.ZoneOffset
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -40,7 +38,7 @@ class AccountRepositoryImpl : AccountRepository {
     private val snameIndex = ConcurrentHashMap<Int, ArrayList<Int>>()
 
     private val emailDomainIndex = ConcurrentHashMap<String, ArrayList<Int>>()
-    private val emailIndex = Array<AirConcurrentMap<String, Int>>(36) { AirConcurrentMap() }
+    private val emailIndex = Array(36) { ConcurrentHashMap<String, Int>() }
 
     private val phoneCodeIndex = Array<ArrayList<Int>>(1000) { ArrayList() }
 
@@ -48,9 +46,9 @@ class AccountRepositoryImpl : AccountRepository {
 
     private val cityIndex = ConcurrentHashMap<Int, ArrayList<Int>>()
 
-    private val birthIndex = AirConcurrentMap<Int, Int>()
+    private val birthIndex = Array(100) { ArrayList<Int>() }
 
-    private val joinedIndex = AirConcurrentMap<Int, MutableCollection<Int>>()
+    private val joinedIndex = Array(10) { ArrayList<Int>() }
 
     private val interestIndex = ConcurrentHashMap<Int, ArrayList<Int>>()
 
@@ -183,14 +181,11 @@ class AccountRepositoryImpl : AccountRepository {
             }
 
             measureTimeAndReturnResult("birth index:") {
-                birthIndex[account.birth] = account.id
+                addToSortedCollection(birthIndex[getYear(account.birth) - 1920], account.id)
             }
 
             measureTimeAndReturnResult("joined index:") {
-                val joinedBucket = joinedIndex.computeIfAbsent(account.joined) { ArrayList(200) }
-                synchronized(joinedBucket) {
-                    joinedBucket.add(account.id)
-                }
+                addToSortedCollection(joinedIndex[getYear(account.joined) - 2010], account.id)
             }
 
             measureTimeAndReturnResult("interest index:") {
@@ -241,27 +236,23 @@ class AccountRepositoryImpl : AccountRepository {
     }
 
     override fun filter(filterRequest: FilterRequest): List<MutableMap<String, Any?>> {
-        val filters = mutableListOf<Set<Int>>()
         val indexes = mutableListOf<Iterator<Int>>()
         filterRequest.email?.let { (domain, lt, gt) ->
             if (domain != null) indexes.add(emailDomainIndex[domain]?.iterator() ?: emptyIterator())
-            if (lt != null || gt != null) {
-                filters.add(getByEmailLtGt(lt, gt))
-            }
         }
 
         filterRequest.fname?.let { (eq, any, _) ->
             if (eq != null) indexes.add(fnames[eq]?.let { fnameIndex[it]?.iterator() } ?: emptyIterator())
             if (any != null) indexes.add(any.map {
                 (fnames[it]?.let { fnameIndex[it]?.iterator() } ?: emptyIterator())
-            }.let { joinSequences(it).iterator() })
+            }.let { joinSequences(it) })
         }
 
         filterRequest.sname?.let { (eq, starts, _) ->
             if (starts != null) {
                 indexes.add(snames.filter { it.key.startsWith(starts) }.map {
                     snameIndex[it.value]?.iterator() ?: emptyIterator()
-                }.let { joinSequences(it).iterator() })
+                }.let { joinSequences(it) })
             }
             if (eq != null) indexes.add(snames[eq]?.let { snameIndex[it]?.iterator() } ?: emptyIterator())
         }
@@ -278,18 +269,28 @@ class AccountRepositoryImpl : AccountRepository {
             if (eq != null) indexes.add(cities[eq]?.let { cityIndex[it]?.iterator() } ?: emptyIterator())
             if (any != null) indexes.add(any.map {
                 cities[it]?.let { cityIndex[it]?.iterator() } ?: emptyIterator()
-            }.let { joinSequences(it).iterator() })
+            }.let { joinSequences(it) })
         }
 
         filterRequest.birth?.let { (lt, gt, year) ->
-            when {
-                lt != null && gt != null -> birthIndex.subMap(gt, lt)
-                lt != null -> birthIndex.headMap(lt)
-                gt != null -> birthIndex.tailMap(gt)
-                else -> null
-            }?.values?.let { filters.add(it.toSet()) }
+            // from 01.01.1950 to 01.01.2005
 
-            if (year != null) filters.add(queryByYear(year, birthIndex).toSet())
+            val ltY = checkBirthYear(lt?.let { getYear(lt) - 1920 } ?: 99)
+            val gtY = checkBirthYear(gt?.let { getYear(gt) - 1920 } ?: 0)
+
+            (gtY + 1 until ltY - 1).map { birthIndex[it].iterator() }
+                .plusElement(
+                    if (lt == null) birthIndex[ltY].iterator() else {
+                        birthIndex[ltY].asSequence().filter { getAccountByIndex(it)!!.birth <= lt }.iterator()
+                    }
+                )
+                .plusElement(
+                    if (gt == null) birthIndex[gtY].iterator() else {
+                        birthIndex[gtY].asSequence().filter { getAccountByIndex(it)!!.birth >= gt }.iterator()
+                    }
+                ).let { indexes.add(joinSequences(it)) }
+
+            if (year != null) indexes.add(birthIndex[checkBirthYear(year) - 1920].iterator())
         }
 
         filterRequest.interests?.let { (contains, any) ->
@@ -300,7 +301,7 @@ class AccountRepositoryImpl : AccountRepository {
             }
             any?.let { interests ->
                 interests.map { this.interests[it]?.let { interestIndex[it]?.iterator() } ?: emptyIterator() }
-            }?.let { indexes.add(joinSequences(it).iterator()) }
+            }?.let { indexes.add(joinSequences(it)) }
         }
 
         filterRequest.likes?.let { (contains) ->
@@ -309,14 +310,22 @@ class AccountRepositoryImpl : AccountRepository {
             }
         }
 
-        if (filters.any { it.isEmpty() }) {
-            return emptyList()
-        }
-
         val sequence = if (indexes.isEmpty()) ids.asSequence() else generateSequenceFromIndexes(indexes)
 
         return sequence
             .mapNotNull { getAccountByIndex(it) }
+            .filter { acc ->
+                if (filterRequest.email != null) {
+                    val ltFilter = if (filterRequest.email.lt != null) {
+                        filterRequest.email.lt >= acc.email
+                    } else true
+
+                    val gtFilter = if (filterRequest.email.gt != null) {
+                        filterRequest.email.gt <= acc.email
+                    } else true
+                    ltFilter && gtFilter
+                } else true
+            }
             .filter { id ->
                 filterByNull(filterRequest.fname?.nill, id.fname) &&
                         filterByNull(filterRequest.sname?.nill, id.sname) &&
@@ -325,7 +334,6 @@ class AccountRepositoryImpl : AccountRepository {
                         filterByNull(filterRequest.city?.nill, id.city) &&
                         filterByNull(filterRequest.premium?.nill, id.premium)
             }
-            .filter { acc -> filters.none { !it.contains(acc.id) } }
             .filter { acc ->
                 filterRequest.premium?.let { (now, _) ->
                     if (now != null) acc.premium?.let {
@@ -372,9 +380,7 @@ class AccountRepositoryImpl : AccountRepository {
             .toList()
     }
 
-
     override fun group(groupRequest: GroupRequest): List<Group> {
-        val filters = mutableListOf<Set<Int>>()
         val indexes = mutableListOf<Iterator<Int>>()
 
         groupRequest.sname?.let { snames[it] }?.let { snameIndex[it] }?.let { indexes.add(it.iterator()) }
@@ -386,8 +392,17 @@ class AccountRepositoryImpl : AccountRepository {
         groupRequest.status?.let { statuses[it] }?.let { statusIndex[it] }?.let { indexes.add(it.iterator()) }
         groupRequest.interests?.let { interests[it] }?.let { interestIndex[it] }?.let { indexes.add(it.iterator()) }
 
-        groupRequest.birthYear?.let { queryByYear(it, birthIndex) }?.let { filters.add(it.toSet()) }
-        groupRequest.joinedYear?.let { queryComplexByYear(it, joinedIndex) }?.let { filters.add(it.toSet()) }
+        groupRequest.birthYear?.let { year ->
+            val mappedYear = (year - 2010).let {
+                when {
+                    it > 9 -> 9
+                    it < 0 -> 0
+                    else -> it
+                }
+            }
+            birthIndex[mappedYear]
+        }?.let { indexes.add(it.iterator()) }
+        groupRequest.joinedYear?.let { joinedIndex[it] }?.let { indexes.add(it.iterator()) }
         groupRequest.likes?.let { getLikesByIndex(it) }?.let { indexes.add(it.iterator()) }
 
         data class GroupTemp(val sex: Int?, val status: Int?, val interest: Int?, val country: Int?, val city: Int?)
@@ -403,7 +418,6 @@ class AccountRepositoryImpl : AccountRepository {
         val sequence = if (indexes.isEmpty()) ids.asSequence() else generateSequenceFromIndexes(indexes)
 
         val tempGroups = sequence
-            .filter { id -> filters.none { !it.contains(id) } }
             .mapNotNull { getAccountByIndex(it) }
             .flatMap { acc ->
                 if (useInterest) {
@@ -474,6 +488,16 @@ class AccountRepositoryImpl : AccountRepository {
         }
     }
 
+
+    private fun checkBirthYear(year: Int): Int {
+        return when {
+            year > 99 -> 99
+            year < 0 -> 0
+            else -> year
+        }
+
+    }
+
     private fun int2Sex(int: Int?) = when {
         int == 0 -> 'm'
         int == 1 -> 'f'
@@ -481,16 +505,17 @@ class AccountRepositoryImpl : AccountRepository {
     }
 
     private fun queryByYear(year: Int, index: NavigableMap<Int, Int>): Collection<Int> {
-        val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC).toInt()
-        val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC).toInt() - 1
+        val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(moscowTimeZone).toInt()
+        val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(moscowTimeZone).toInt() - 1
         return index.subMap(from, true, to, true).values
     }
 
     private fun queryComplexByYear(year: Int, index: NavigableMap<Int, MutableCollection<Int>>): Collection<Int> {
-        val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC).toInt()
-        val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(ZoneOffset.UTC).toInt() - 1
+        val from = LocalDateTime.of(year, 1, 1, 0, 0).toEpochSecond(moscowTimeZone).toInt()
+        val to = LocalDateTime.of(year + 1, 1, 1, 0, 0).toEpochSecond(moscowTimeZone).toInt() - 1
         return index.subMap(from, true, to, true).flatMap { it.value }
     }
+
 
     private fun filterByNull(nill: Boolean?, property: Any?) =
         if (nill != null) {
@@ -529,21 +554,25 @@ class AccountRepositoryImpl : AccountRepository {
         }
     }
 
-    private fun getByEmailLtGt(lt: String?, gt: String?): Set<Int> {
-        check(lt != null || gt != null)
-        val ltFirst = lt?.let { getLexIndex(lt[0]) } ?: 35
-        val gtFirst = gt?.let { getLexIndex(gt[0]) } ?: 0
+//    private fun getByEmailLtGt(lt: String?, gt: String?): Set<Int> {
+//        check(lt != null || gt != null)
+//        val ltFirst = lt?.let { getLexIndex(lt[0]) } ?: 35
+//        val gtFirst = gt?.let { getLexIndex(gt[0]) } ?: 0
+//
+//        val localBuckets = this.emailBuckets
+//        return when {
+//            ltFirst < gtFirst -> emptySet()
+//            ltFirst == gtFirst -> emailIndex[ltFirst].subMap(gt, true, lt, true).values.toSet()
+//            else -> (gtFirst + 1 until ltFirst)
+//                .map { localBuckets[it]!! }
+//                .plusElement(if (lt != null) emailIndex[ltFirst].headMap(lt).values.toSet() else localBuckets[ltFirst]!!)
+//                .plusElement(if (gt != null) emailIndex[gtFirst].tailMap(gt).values.toSet() else localBuckets[gtFirst]!!)
+//                .let { CompositeSet(it) }
+//        }
+//    }
 
-        val localBuckets = this.emailBuckets
-        return when {
-            ltFirst < gtFirst -> emptySet()
-            ltFirst == gtFirst -> emailIndex[ltFirst].subMap(gt, true, lt, true).values.toSet()
-            else -> (gtFirst + 1 until ltFirst)
-                .map { localBuckets[it]!! }
-                .plusElement(if (lt != null) emailIndex[ltFirst].headMap(lt).values.toSet() else localBuckets[ltFirst]!!)
-                .plusElement(if (gt != null) emailIndex[gtFirst].tailMap(gt).values.toSet() else localBuckets[gtFirst]!!)
-                .let { CompositeSet(it) }
-        }
+    private fun getYear(timestamp: Int): Int {
+        return LocalDateTime.ofEpochSecond(timestamp.toLong(), 0, moscowTimeZone).year
     }
 
     private fun getLexIndex(char: Char) = when (char) {

@@ -9,7 +9,7 @@ import java.time.ZoneOffset
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
-
+val moscowTimeZone = ZoneOffset.ofHours(3)
 fun parsePhoneCode(phone: String): String {
     var code = ""
     var scrapping = false
@@ -99,12 +99,12 @@ object EmptyIterator : Iterator<Nothing> {
 
 fun emptyIterator() = EmptyIterator
 
-fun joinSequences(indexes: List<Iterator<Int>>) = sequence {
+fun joinSequences(indexes: List<Iterator<Int>>) = iterator {
     val range = (0 until indexes.size)
     val currentVal = Array<Int?>(indexes.size) { null }
     range.forEach { i ->
         if (!indexes[i].hasNext()) {
-            return@sequence
+            return@iterator
         }
         currentVal[i] = indexes[i].next()
     }
@@ -114,7 +114,7 @@ fun joinSequences(indexes: List<Iterator<Int>>) = sequence {
         range.forEach { it ->
             if (currentVal[it] == maxValue) {
                 currentVal[it] = if (!indexes[it].hasNext()) {
-                    return@sequence
+                    return@iterator
                 } else indexes[it].next()
             }
         }
