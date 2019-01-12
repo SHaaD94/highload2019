@@ -1,4 +1,4 @@
-package not.mine;
+package not.mine.unused;
 
 public interface ICache {
     byte[] get(long key);

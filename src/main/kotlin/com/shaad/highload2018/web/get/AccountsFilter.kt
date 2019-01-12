@@ -1,7 +1,10 @@
 package com.shaad.highload2018.web.get
 
+import com.google.common.primitives.Chars
+import com.google.common.primitives.Ints
 import com.google.inject.Inject
-import com.shaad.highload2018.repository.AccountRepository
+import com.shaad.highload2018.repository.*
+import com.shaad.highload2018.utils.ByteArrayBuilder
 import com.shaad.highload2018.web.HandlerAnswer
 import com.shaad.highload2018.web.HandlerBase
 import org.rapidoid.buffer.Buf
@@ -11,6 +14,22 @@ import org.rapidoid.http.HttpVerb
 
 class AccountsFilter @Inject constructor(private val repository: AccountRepository) : HandlerBase() {
     private val path = "/accounts/filter/".toByteArray()
+
+    private val accountsStart = "{\"accounts\":[".toByteArray()
+    private val accountsEnd = "]}".toByteArray()
+
+    private val idBytes = "\"id\":".toByteArray()
+    private val emailBytes = "\"email\":\"".toByteArray()
+    private val sexBytes = "\"sex\":\"".toByteArray()
+    private val fnameBytes = "\"fname\":\"".toByteArray()
+    private val snameBytes = "\"sname\":\"".toByteArray()
+    private val statusBytes = "\"status\":\"".toByteArray()
+    private val phoneBytes = "\"phone\":\"".toByteArray()
+    private val countryBytes = "\"country\":\"".toByteArray()
+    private val cityBytes = "\"city\":\"".toByteArray()
+    private val birthBytes = "\"birth\":".toByteArray()
+    private val premiumStart = "\"premium\":{\"start\":".toByteArray()
+    private val premiumFinish = ",\"finish\":".toByteArray()
 
     override fun method(): HttpVerb = HttpVerb.GET
 
@@ -26,9 +45,100 @@ class AccountsFilter @Inject constructor(private val repository: AccountReposito
             return HandlerAnswer(400, e.message!!.toByteArray())
         }
 
-        val response = mapOf("accounts" to repository.filter(filterRequest))
+        var firstAccount = true
+        val bytes = ByteArrayBuilder()
+        bytes.append(accountsStart)
+        repository.filter(filterRequest)
+            .forEach { acc ->
+                if (firstAccount) firstAccount = false else bytes.append(comma)
+                bytes
+                    .append(figuredBracketOpen)
+                    //id
+                    .append(idBytes)
+                    .append(acc.id!!.toString().toByteArray())
+                    .append(comma)
+                    //email
+                    .append(emailBytes)
+                    .append(acc.email)
+                    .append(quotes)
 
-        return HandlerAnswer(200, objectMapper.writeValueAsBytes(response))
+                if (filterRequest.sex != null) {
+                    bytes.append(comma)
+                    bytes.append(sexBytes)
+                    bytes.append(int2Sex(acc.sex)!!.toString().toByteArray())
+                    bytes.append(quotes)
+                }
+                if (filterRequest.status != null) {
+                    bytes.append(comma)
+                    bytes.append(statusBytes)
+                    bytes.append(statusesInv[acc.status]!!.toByteArray())
+                    bytes.append(quotes)
+                }
+                if (filterRequest.fname != null) {
+                    val fname = acc.fname?.let { fnamesInv[it] }
+                    if (fname != null) {
+                        bytes.append(comma)
+                        bytes.append(fnameBytes)
+                        bytes.append(fname.toByteArray())
+                        bytes.append(quotes)
+                    }
+                }
+                if (filterRequest.sname != null) {
+                    val sname = acc.sname?.let { snamesInv[it] }
+                    if (sname != null) {
+                        bytes.append(comma)
+                        bytes.append(snameBytes)
+                        bytes.append(sname.toByteArray())
+                        bytes.append(quotes)
+                    }
+                }
+                if (filterRequest.phone != null) {
+                    if (acc.phone != null) {
+                        bytes.append(comma)
+                        bytes.append(phoneBytes)
+                        bytes.append(acc.phone)
+                        bytes.append(quotes)
+                    }
+                }
+                if (filterRequest.country != null) {
+                    val country = acc.country?.let { countriesInv[it] }
+                    if (country != null) {
+                        bytes.append(comma)
+                        bytes.append(countryBytes)
+                        bytes.append(country.toByteArray())
+                        bytes.append(quotes)
+                    }
+                }
+                if (filterRequest.city != null) {
+                    val city = acc.city?.let { citiesInv[it] }
+                    if (city != null) {
+                        bytes.append(comma)
+                        bytes.append(cityBytes)
+                        bytes.append(city.toByteArray())
+                        bytes.append(quotes)
+                    }
+                }
+                if (filterRequest.birth != null) {
+                    bytes.append(comma)
+                    bytes.append(birthBytes)
+                    bytes.append(acc.birth.toString().toByteArray())
+                }
+                if (filterRequest.premium != null) {
+                    if (acc.premium != null) {
+                        bytes.append(comma)
+                        bytes.append(premiumStart)
+                        bytes.append(acc.premium.start.toString().toByteArray())
+                        bytes.append(premiumFinish)
+                        bytes.append(acc.premium.finish.toString().toByteArray())
+                        bytes.append(figuredBracketClose)
+                    }
+                }
+                bytes.append(figuredBracketClose)
+            }
+        bytes.append(accountsEnd)
+        val result = bytes.toArray()
+
+        return HandlerAnswer(200, result)
     }
 
     private fun parseFilterRequest(params: Map<String, String>): FilterRequest {
@@ -125,7 +235,7 @@ class AccountsFilter @Inject constructor(private val repository: AccountReposito
         val sexRequest = sexEq?.let { SexRequest(it) }
 
         val emailRequest = if (emailDomain != null || emailGt != null || emailLt != null)
-            EmailRequest(emailDomain, emailLt, emailGt)
+            EmailRequest(emailDomain, emailLt?.toByteArray(), emailGt?.toByteArray())
         else null
 
         val statusRequest = if (statusEq != null || statusNeq != null)
@@ -188,8 +298,8 @@ class AccountsFilter @Inject constructor(private val repository: AccountReposito
 data class SexRequest(val eq: Char)
 data class EmailRequest(
     val domain: String?,
-    val lt: String?,
-    val gt: String?
+    val lt: ByteArray?,
+    val gt: ByteArray?
 )
 
 data class StatusRequest(

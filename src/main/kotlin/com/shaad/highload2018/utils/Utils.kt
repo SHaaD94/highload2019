@@ -70,7 +70,7 @@ fun <T> measureTimeAndReturnResult(opName: String = "", block: () -> T): T {
     return res
 }
 
-class CompositeSet(private val sets: Collection<Set<Int>>) : Set<Int> {
+class CompositeSet(val sets: Collection<Set<Int>>) : Set<Int> {
     override val size = sets.sumBy { it.size }
     override fun containsAll(elements: Collection<Int>): Boolean {
         TODO("not implemented")
@@ -100,6 +100,9 @@ object EmptyIterator : Iterator<Nothing> {
 fun emptyIterator() = EmptyIterator
 
 fun joinIterators(indexes: List<Iterator<Int>>) = iterator {
+    if (indexes.isEmpty()) {
+        return@iterator
+    }
     val range = (0 until indexes.size)
     val currentVal = Array<Int?>(indexes.size) { null }
     range.forEach { i ->
@@ -121,6 +124,9 @@ fun joinIterators(indexes: List<Iterator<Int>>) = iterator {
     }
 }
 
+fun getYear(timestamp: Int): Int {
+    return LocalDateTime.ofEpochSecond(timestamp.toLong(), 0, moscowTimeZone).year
+}
 
 fun generateSequenceFromIndexes(indexes: List<Iterator<Int>>): Sequence<Int> = sequence {
     val range = (0 until indexes.size)
@@ -171,3 +177,38 @@ fun generateSequenceFromIndexes(indexes: List<Iterator<Int>>): Sequence<Int> = s
         }
     }
 }
+
+
+fun getIterator(array: Array<ArrayList<Int>>?): Iterator<Int> {
+    array ?: return emptyIterator()
+    val resultIterators = array.filter { !it.isEmpty() }.map { it.iterator() }
+    return joinIterators(resultIterators)
+}
+
+fun addToSortedCollection(list: ArrayList<Int>, id: Int?) {
+    synchronized(list) {
+        val closest = searchClosest(id!!, list)
+
+        list.add(closest, id)
+    }
+}
+
+fun searchClosest(target: Int, nums: ArrayList<Int>): Int {
+    var i = 0
+    var j = nums.size - 1
+
+    while (i <= j) {
+        val mid = (i + j) / 2
+
+        if (target < nums[mid]) {
+            i = mid + 1
+        } else if (target > nums[mid]) {
+            j = mid - 1
+        } else {
+            return mid
+        }
+    }
+
+    return i
+}
+

@@ -1,4 +1,4 @@
-package not.mine;
+package not.mine.unused;
 
 public class MemoryCacheConfiguration {
     private long capacity;

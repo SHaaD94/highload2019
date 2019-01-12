@@ -15,6 +15,14 @@ interface Handler {
 
 abstract class HandlerBase : Handler {
     protected val emptyResponse = "{}".toByteArray()
+    protected val comma = ",".toByteArray()
+    protected val quadBracketOpen = "[".toByteArray()
+    protected val quadBracketClose = "]".toByteArray()
+    protected val figuredBracketOpen = "{".toByteArray()
+    protected val figuredBracketClose = "}".toByteArray()
+    protected val colon = ":".toByteArray()
+    protected val quotes = "\"".toByteArray()
+    protected val commaQuotes = "\",".toByteArray()
 
     protected val objectMapper = jacksonObjectMapper()
 
