@@ -1,7 +1,6 @@
 package com.shaad.highload2018.web.post
 
 import com.google.inject.Inject
-import com.shaad.highload2018.domain.Account
 import com.shaad.highload2018.repository.AccountRepository
 import com.shaad.highload2018.web.HandlerAnswer
 import com.shaad.highload2018.web.HandlerBase
@@ -22,7 +21,8 @@ class AccountsNew @Inject constructor(private val accountsRepository: AccountRep
 
     override fun process(buf: Buf, pathRange: BufRange, paramsRange: BufRange, bodyRange: BufRange): HandlerAnswer {
         return try {
-            accountsRepository.addAccount(objectMapper.readValue<Account>(buf[bodyRange], Account::class.java))
+            //todo uncomment
+//            accountsRepository.addAccount(objectMapper.readValue<Account>(buf[bodyRange], Account::class.java))
             okResponse
         } catch (e: Exception) {
             HandlerAnswer(400, emptyResponse)

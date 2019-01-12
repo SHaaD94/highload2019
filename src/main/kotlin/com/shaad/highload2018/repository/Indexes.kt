@@ -35,6 +35,8 @@ val joinedIndex = Array(10) { Array(20) { ArrayList<Int>() } }
 
 val interestIndex = ConcurrentHashMap<Int, Array<ArrayList<Int>>>()
 
+val premiumNowIndex = Array(20) { ArrayList<Int>() }
+
 val likeIndex0_250 = Array<ArrayList<Int>>(250_000) { ArrayList() }
 val likeIndex250_500 = Array<ArrayList<Int>>(250_000) { ArrayList() }
 val likeIndex500_750 = Array<ArrayList<Int>>(250_000) { ArrayList() }

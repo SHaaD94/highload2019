@@ -12,6 +12,7 @@ interface AccountRepository {
     fun addAccount(account: Account)
     fun filter(filterRequest: FilterRequest): Sequence<InnerAccount>
     fun group(groupRequest: GroupRequest): Sequence<Group>
+    fun recommend(id: Int?, city: String?, country: String?, limit: Int): Sequence<InnerAccount>
 }
 
 class AccountRepositoryImpl : AccountRepository {
@@ -125,6 +126,12 @@ class AccountRepositoryImpl : AccountRepository {
             }
         }
 
+        measureTimeAndReturnResult("premium index:") {
+            if (account.premium != null && System.currentTimeMillis() / 1000 in (account.premium.start..account.premium.finish)) {
+                addToSortedCollection(getIdBucket(account.id, premiumNowIndex), account.id)
+            }
+        }
+
         measureTimeAndReturnResult("like index:") {
             (account.likes ?: emptyList()).forEach { (likeIdInt, _) ->
                 val likeId = likeIdInt!!
@@ -160,6 +167,11 @@ class AccountRepositoryImpl : AccountRepository {
         }
         filterRequest.sex?.let { (eq) ->
             indexes.add(getIterator(sexIndex[eq]))
+        }
+        filterRequest.premium?.let { (now, _) ->
+            if (now != null) {
+                indexes.add(getIterator(premiumNowIndex))
+            }
         }
         filterRequest.status?.let { (eq, neq) ->
             if (eq != null) {
@@ -276,13 +288,6 @@ class AccountRepositoryImpl : AccountRepository {
                         filterByNull(filterRequest.country?.nill, id.country) &&
                         filterByNull(filterRequest.city?.nill, id.city) &&
                         filterByNull(filterRequest.premium?.nill, id.premium)
-            }
-            .filter { acc ->
-                filterRequest.premium?.let { (now, _) ->
-                    if (now != null) acc.premium?.let {
-                        System.currentTimeMillis() / 1000 in (it.start..it.finish)
-                    } == true else true
-                } ?: true
             }
             .take(filterRequest.limit)
     }
@@ -401,6 +406,11 @@ class AccountRepositoryImpl : AccountRepository {
                 false -> property == null
             }
         } else true
+
+
+    override fun recommend(id: Int?, city: String?, country: String?, limit: Int): Sequence<InnerAccount> {
+        return emptySequence()
+    }
 }
 
 

@@ -31,7 +31,7 @@ CMD ["java", \
      "-XX:NewSize=300m",\
      "-XX:-UseAdaptiveSizePolicy",\
 \
-     "-Xmx1500m",\
-     "-Xms1500m",\
+     "-Xmx1400m",\
+     "-Xms1400m",\
 \
      "-jar", "app.jar"]

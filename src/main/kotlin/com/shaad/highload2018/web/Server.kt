@@ -37,25 +37,25 @@ class Server @Inject constructor(
         return method2Handler[method]
             ?.firstOrNull { it.matches(buf, data.path) }
             ?.let { handler ->
-                kotlin.runCatching { handler.process(buf, data.path, data.query, data.body) }
-                    .onSuccess {
-                        measureTimeAndReturnResult(buf[data.path]) {
+                measureTimeAndReturnResult(buf[data.path]) {
+                    kotlin.runCatching { handler.process(buf, data.path, data.query, data.body) }
+                        .onSuccess {
                             startResponse(ctx, it.code, true)
                             writeBody(ctx, it.body, 0, it.body.size, json)
                         }
-                    }
-                    .onFailure { error ->
-                        error.printStackTrace()
-                        startResponse(ctx, 500, true)
-                        writeBody(
-                            ctx,
-                            error.message?.toByteArray() ?: "Internal server error".toByteArray(),
-                            0,
-                            error.message?.toByteArray()?.size ?: 21,
-                            json
-                        )
-                    }.getOrNull()
-                HttpStatus.DONE
+                        .onFailure { error ->
+                            error.printStackTrace()
+                            startResponse(ctx, 500, true)
+                            writeBody(
+                                ctx,
+                                error.message?.toByteArray() ?: "Internal server error".toByteArray(),
+                                0,
+                                error.message?.toByteArray()?.size ?: 21,
+                                json
+                            )
+                        }.getOrNull()
+                    HttpStatus.DONE
+                }
             }
             ?: HttpStatus.NOT_FOUND
     }
