@@ -1,6 +1,7 @@
 package com.shaad.highload2018.web
 
 import com.google.inject.Inject
+import com.shaad.highload2018.utils.measureTimeAndReturnResult
 import org.rapidoid.buffer.Buf
 import org.rapidoid.config.Conf
 import org.rapidoid.http.AbstractHttpServer
@@ -38,8 +39,10 @@ class Server @Inject constructor(
             ?.let { handler ->
                 kotlin.runCatching { handler.process(buf, data.path, data.query, data.body) }
                     .onSuccess {
-                        startResponse(ctx, it.code, true)
-                        writeBody(ctx, it.body, 0, it.body.size, json)
+                        measureTimeAndReturnResult(buf[data.path]) {
+                            startResponse(ctx, it.code, true)
+                            writeBody(ctx, it.body, 0, it.body.size, json)
+                        }
                     }
                     .onFailure { error ->
                         error.printStackTrace()

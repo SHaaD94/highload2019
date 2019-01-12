@@ -106,19 +106,21 @@ fun joinIterators(indexes: List<Iterator<Int>>) = iterator {
     val range = (0 until indexes.size)
     val currentVal = Array<Int?>(indexes.size) { null }
     range.forEach { i ->
-        if (!indexes[i].hasNext()) {
-            return@iterator
+        if (indexes[i].hasNext()) {
+            currentVal[i] = indexes[i].next()
         }
-        currentVal[i] = indexes[i].next()
     }
     while (true) {
-        val maxValue = currentVal.maxBy { it!! }!!
+        val maxValue = currentVal.asSequence().filter { it != null }.maxBy { it!! } ?: return@iterator
         yield(maxValue)
         range.forEach { it ->
-            if (currentVal[it] == maxValue) {
+            val c = currentVal[it] ?: return@forEach
+            if (c == maxValue) {
                 currentVal[it] = if (!indexes[it].hasNext()) {
-                    return@iterator
-                } else indexes[it].next()
+                    null
+                } else {
+                    indexes[it].next()
+                }
             }
         }
     }
@@ -129,6 +131,9 @@ fun getYear(timestamp: Int): Int {
 }
 
 fun generateSequenceFromIndexes(indexes: List<Iterator<Int>>): Sequence<Int> = sequence {
+    if (indexes.isEmpty()) {
+        return@sequence
+    }
     val range = (0 until indexes.size)
     val currentVal = Array<Int?>(indexes.size) { null }
     range.forEach { i ->

@@ -8,12 +8,13 @@ CMD ["java", \
 \
      "-XX:+UseG1GC",\
 \
-     "-XX:+PrintGCDetails",\
-#     "-XX:+PrintGCApplicationStoppedTime",\
+#     "-XX:+PrintGCDetails",\
+     "-XX:+PrintGCApplicationStoppedTime",\
+     "-XX:+PrintGCTimeStamps",\
 \
      "-Djava.lang.Integer.IntegerCache.high=1700000",\
 \
-     "-XX:ParallelGCThreads=4",\
+     "-XX:ParallelGCThreads=8",\
      "-XX:InitiatingHeapOccupancyPercent=40", \
      "-XX:MaxGCPauseMillis=500",\
      "-XX:G1ReservePercent=5",\
@@ -23,7 +24,7 @@ CMD ["java", \
      "-XX:+UseCompressedOops",\
 \
 \
-     "-XX:MaxMetaspaceSize=128m",\
+     "-XX:MaxMetaspaceSize=64m",\
      "-XX:SurvivorRatio=6",\
 \
      "-XX:MaxNewSize=300m",\

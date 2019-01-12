@@ -11,7 +11,7 @@ import com.shaad.highload2018.web.get.GroupRequest
 interface AccountRepository {
     fun addAccount(account: Account)
     fun filter(filterRequest: FilterRequest): Sequence<InnerAccount>
-    fun group(groupRequest: GroupRequest): List<Group>
+    fun group(groupRequest: GroupRequest): Sequence<Group>
 }
 
 class AccountRepositoryImpl : AccountRepository {
@@ -287,7 +287,8 @@ class AccountRepositoryImpl : AccountRepository {
             .take(filterRequest.limit)
     }
 
-    override fun group(groupRequest: GroupRequest): List<Group> {
+    private val listWithNull = listOf(null)
+    override fun group(groupRequest: GroupRequest): Sequence<Group> {
         val indexes = mutableListOf<Iterator<Int>>()
 
         groupRequest.sname?.let { snames[it] }?.let { snameIndex[it] }?.let { indexes.add(getIterator(it)) }
@@ -315,85 +316,77 @@ class AccountRepositoryImpl : AccountRepository {
         }?.let { indexes.add(getIterator(it)) }
         groupRequest.likes?.let { getLikesByIndex(it) }?.let { indexes.add(it.iterator()) }
 
-        data class GroupTemp(val sex: Int?, val status: Int?, val interest: Int?, val country: Int?, val city: Int?)
-
         val useSex = groupRequest.keys.contains("sex")
         val useStatus = groupRequest.keys.contains("status")
         val useInterest = groupRequest.keys.contains("interests")
         val useCountry = groupRequest.keys.contains("country")
         val useCity = groupRequest.keys.contains("city")
 
-        val listWithNull = listOf(null)
-
         val sequence = if (indexes.isEmpty()) ids.asSequence() else generateSequenceFromIndexes(indexes)
 
-        val tempGroups = sequence
+        //sex->status->country->city->interests
+        val map =
+            mutableMapOf<Int?, MutableMap<Int?, MutableMap<Int?, MutableMap<Int?, MutableMap<Int?, Int>>>>>()
+        sequence
             .mapNotNull { getAccountByIndex(it) }
-            .flatMap { acc ->
-                if (useInterest) {
-                    (acc.interests ?: listWithNull).map { interest ->
-                        GroupTemp(
-                            if (useSex) acc.sex else null,
-                            if (useStatus) acc.status else null,
-                            interest,
-                            if (useCountry) acc.country else null,
-                            if (useCity) acc.city else null
-                        )
-                    }.asSequence()
-                } else sequenceOf(
-                    GroupTemp(
-                        if (useSex) acc.sex else null,
-                        if (useStatus) acc.status else null,
-                        null,
-                        if (useCountry) acc.country else null,
-                        if (useCity) acc.city else null
-                    )
-                )
-            }.groupingBy { it }.eachCount()
-            .entries.toList()
+            .forEach { acc ->
+                val sexMap =
+                    map.computeIfAbsent(if (useSex) acc.sex else null) { HashMap() }
+                val statusMap =
+                    sexMap.computeIfAbsent(if (useStatus) acc.status else null) { HashMap() }
+                val countryMap =
+                    statusMap.computeIfAbsent(if (useCountry) acc.country else null) { HashMap() }
+                val cityMap =
+                    countryMap.computeIfAbsent(if (useCity) acc.city else null) { HashMap() }
 
-        val resultGroups = ArrayList<Pair<GroupTemp, Int>>()
-        var iterations = groupRequest.limit
-        val checkedEntries = mutableListOf<Any>()
+                val interests = if (useInterest) acc.interests ?: listWithNull else listWithNull
+                interests.forEach { interest -> cityMap.compute(interest) { _, value -> (value ?: 0) + 1 } }
+            }
 
-        fun getComparator(pos: Int, pair: Map.Entry<GroupTemp, Int>): String? =
+        val tempGroups = mutableListOf<Group>()
+        map.entries.forEach { (sex, statusMap) ->
+            statusMap.forEach { (status, countryMap) ->
+                countryMap.forEach { (country, cityMap) ->
+                    cityMap.forEach { city, interests ->
+                        interests.forEach { interest, count ->
+                            tempGroups.add(Group(sex, status, interest, country, city, count))
+                        }
+                    }
+                }
+            }
+        }
+
+        fun getComparator(pos: Int, g: Group): String? =
             when (groupRequest.keys.getOrNull(pos)) {
-                "sex" -> int2Sex(pair.key.sex).toString()
-                "status" -> pair.key.status?.let { statusesInv[it] }
-                "interests" -> pair.key.interest?.let { interestsInv[it] }
-                "country" -> pair.key.country?.let { countriesInv[it] }
-                "city" -> pair.key.city?.let { citiesInv[it] }
+                "sex" -> int2Sex(g.sex).toString()
+                "status" -> g.status?.let { statusesInv[it] }
+                "interests" -> g.interest?.let { interestsInv[it] }
+                "country" -> g.country?.let { countriesInv[it] }
+                "city" -> g.city?.let { citiesInv[it] }
                 else -> null
             }
 
-        val comparator = compareBy<Map.Entry<GroupTemp, Int>>({ it.value },
+        val comparator = compareBy<Group>({ it.count },
             { getComparator(0, it) }, { getComparator(1, it) }, { getComparator(2, it) },
             { getComparator(3, it) }, { getComparator(4, it) })
-        while (iterations != 0) {
-            val element =
-                tempGroups
-                    .asSequence()
-                    .filter { e -> checkedEntries.none { e === it } }
-                    .let { groups ->
-                        if (groupRequest.order == 1) groups.minWith(comparator) else groups.maxWith(comparator)
-                    } ?: break
-            checkedEntries.add(element)
-            resultGroups.add(element.key to element.value)
-            iterations--
-        }
 
-        return resultGroups.map {
-            Group(
-                it.second,
-                int2Sex(it.first.sex),
-                it.first.status?.let { statusesInv[it] },
-                it.first.interest?.let { interestsInv[it] },
-                it.first.country?.let { countriesInv[it] },
-                it.first.city?.let { citiesInv[it] }
-            )
+        return sequence {
+            var iterations = groupRequest.limit
+            val checkedEntries = mutableListOf<Any>()
+            while (iterations != 0) {
+                val element =
+                    tempGroups
+                        .asSequence()
+                        .filter { e -> checkedEntries.none { e === it } }
+                        .let { groups ->
+                            if (groupRequest.order == 1) groups.minWith(comparator) else groups.maxWith(comparator)
+                        } ?: return@sequence
+                checkedEntries.add(element)
+                iterations--
+                yield(element)
+            }
         }
     }
-
 
     private fun checkBirthYear(year: Int): Int = when {
         year > 99 -> 99
