@@ -7,7 +7,6 @@ import com.shaad.highload2018.utils.*
 import com.shaad.highload2018.web.get.FilterRequest
 import com.shaad.highload2018.web.get.Group
 import com.shaad.highload2018.web.get.GroupRequest
-import java.nio.ByteBuffer
 
 interface AccountRepository {
     fun addAccount(account: Account)
@@ -268,69 +267,51 @@ class AccountRepositoryImpl : AccountRepository {
             }
         }
 
-        if (indexes.isEmpty()) {
-            val accs = ArrayList<InnerAccount>(filterRequest.limit)
-            var counter = 0
-            var id = maxId
-            while (counter < filterRequest.limit && id >= 0) {
-                val acc = getAccountByIndex(id) ?: continue
-                if (isIdAppropriate(filterRequest, acc)) {
-                    counter++
-                    id--
-                    accs.add(acc)
-                }
-            }
-            return accs.asSequence()
-        }
+        val sequence = if (indexes.isEmpty()) fullIdsSequence() else generateSequenceFromIndexes(indexes)
 
-        return generateSequenceFromIndexes(indexes)
+        return sequence
             .mapNotNull { getAccountByIndex(it) }
             .filter { acc ->
-                isIdAppropriate(filterRequest, acc)
+                if (filterRequest.email != null) {
+                    val ltFilter = if (filterRequest.email.lt != null) {
+                        lexComparator.compare(acc.email, filterRequest.email.lt) <= 0
+                    } else true
+
+                    val gtFilter = if (filterRequest.email.gt != null) {
+                        lexComparator.compare(acc.email, filterRequest.email.gt) >= 0
+                        true
+                    } else true
+                    ltFilter && gtFilter
+                } else true
+            }
+            .filter { id ->
+                filterByNull(filterRequest.fname?.nill, id.fname) &&
+                        filterByNull(filterRequest.sname?.nill, id.sname) &&
+                        filterByNull(filterRequest.phone?.nill, id.phone) &&
+                        filterByNull(filterRequest.country?.nill, id.country) &&
+                        filterByNull(filterRequest.city?.nill, id.city) &&
+                        filterByNull(filterRequest.premium?.nill, id.premiumStart)
             }
             .take(filterRequest.limit)
     }
 
-    private fun isIdAppropriate(
-        filterRequest: FilterRequest,
-        acc: InnerAccount
-    ): Boolean {
-        return (if (filterRequest.email != null) {
-            val ltFilter = if (filterRequest.email.lt != null) {
-                lexComparator.compare(acc.email, filterRequest.email.lt) <= 0
-            } else true
-
-            val gtFilter = if (filterRequest.email.gt != null) {
-                lexComparator.compare(acc.email, filterRequest.email.gt) >= 0
-                true
-            } else true
-            ltFilter && gtFilter
-        } else true) && filterByNull(filterRequest.fname?.nill, acc.fname) &&
-                filterByNull(filterRequest.sname?.nill, acc.sname) &&
-                filterByNull(filterRequest.phone?.nill, acc.phone) &&
-                filterByNull(filterRequest.country?.nill, acc.country) &&
-                filterByNull(filterRequest.city?.nill, acc.city) &&
-                filterByNull(filterRequest.premium?.nill, acc.premiumStart)
-    }
-
     private val listWithNull = listOf(null)
     override fun group(groupRequest: GroupRequest): Sequence<Group> {
-        val indexes = mutableListOf<Array<ArrayList<Int>>>()
-        var likeIndex: ArrayList<Int>? = null
+        val indexes = mutableListOf<Iterator<Int>>()
 
-        groupRequest.sname?.let { snames[it] }?.let { snameIndex[it] }?.let { indexes.add(it) }
-        groupRequest.fname?.let { fnames[it] }?.let { fnameIndex[it] }?.let { indexes.add(it) }
-        groupRequest.sex?.let { sexIndex[it] }?.let { indexes.add(it) }
+        groupRequest.sname?.let { snames[it] }?.let { snameIndex[it] }?.let { indexes.add(getIterator(it)) }
+        groupRequest.fname?.let { fnames[it] }?.let { fnameIndex[it] }?.let { indexes.add(getIterator(it)) }
+        groupRequest.sex?.let { sexIndex[it] }?.let { indexes.add(getIterator(it)) }
 
-        groupRequest.country?.let { countries[it]?.let { countryIndex[it] } }?.let { indexes.add(it) }
-        groupRequest.city?.let { cities[it]?.let { cityIndex[it] } }?.let { indexes.add(it) }
-        groupRequest.status?.let { statuses[it] }?.let { statusIndex[it] }?.let { indexes.add(it) }
-        groupRequest.interests?.let { interests[it] }?.let { interestIndex[it] }?.let { indexes.add(it) }
+        groupRequest.country?.let { countries[it]?.let { countryIndex[it] } }?.let { indexes.add(getIterator(it)) }
+        groupRequest.city?.let { cities[it]?.let { cityIndex[it] } }?.let { indexes.add(getIterator(it)) }
+        groupRequest.status?.let { statuses[it] }?.let { statusIndex[it] }?.let { indexes.add(getIterator(it)) }
+        groupRequest.interests?.let { interests[it] }?.let { interestIndex[it] }?.let { indexes.add(getIterator(it)) }
 
         groupRequest.birthYear?.let { year ->
             val mappedYear = checkBirthYear(year - 1920)
             birthIndex[mappedYear]
-        }?.let { indexes.add(it) }
+        }?.let { indexes.add(getIterator(it)) }
         groupRequest.joinedYear?.let { year ->
             val mappedYear = (year - 2010).let {
                 when {
@@ -340,8 +321,8 @@ class AccountRepositoryImpl : AccountRepository {
                 }
             }
             joinedIndex[mappedYear]
-        }?.let { indexes.add(it) }
-        groupRequest.likes?.let { getLikesByIndex(it) }?.let { likeIndex = it }
+        }?.let { indexes.add(getIterator(it)) }
+        groupRequest.likes?.let { getLikesByIndex(it) }?.let { indexes.add(it.iterator()) }
 
         val useSex = groupRequest.keys.contains("sex")
         val useStatus = groupRequest.keys.contains("status")
@@ -349,85 +330,26 @@ class AccountRepositoryImpl : AccountRepository {
         val useCountry = groupRequest.keys.contains("country")
         val useCity = groupRequest.keys.contains("city")
 
+        val sequence = if (indexes.isEmpty()) fullIdsSequence() else generateSequenceFromIndexes(indexes)
+
         //sex->status->country->city->interests
         val map =
             mutableMapOf<Int?, MutableMap<Int?, MutableMap<Int?, MutableMap<Int?, MutableMap<Int?, Int?>>>>>()
+        sequence
+            .mapNotNull { getAccountByIndex(it) }
+            .forEach { acc ->
+                val sexMap =
+                    map.computeIfAbsent(if (useSex) acc.sex else null) { HashMap() }
+                val statusMap =
+                    sexMap.computeIfAbsent(if (useStatus) acc.status else null) { HashMap() }
+                val countryMap =
+                    statusMap.computeIfAbsent(if (useCountry) acc.country else null) { HashMap() }
+                val cityMap =
+                    countryMap.computeIfAbsent(if (useCity) acc.city else null) { HashMap() }
 
-        fun countId(id: Int?) {
-            val acc = getAccountByIndex(id!!) ?: return
-            val sexMap =
-                map.computeIfAbsent(if (useSex) acc.sex else null) { HashMap() }
-            val statusMap =
-                sexMap.computeIfAbsent(if (useStatus) acc.status else null) { HashMap() }
-            val countryMap =
-                statusMap.computeIfAbsent(if (useCountry) acc.country else null) { HashMap() }
-            val cityMap =
-                countryMap.computeIfAbsent(if (useCity) acc.city else null) { HashMap() }
-
-            val interests = if (useInterest) acc.interests ?: listWithNull else listWithNull
-            interests.forEach { interest ->
-                cityMap.compute(interest) { _, value ->
-                    Integer.valueOf((value ?: 0) + 1)
-                }
+                val interests = if (useInterest) acc.interests ?: listWithNull else listWithNull
+                interests.forEach { interest -> cityMap.compute(interest) { _, value -> (value ?: 0) + 1 } }
             }
-        }
-
-        if (indexes.isEmpty() && likeIndex != null) {
-            for (id in (maxId downTo 0)) {
-                countId(id)
-            }
-        } else {
-//            val idBucketCounters = Array(indexes.size){0}
-//            val counters = Array(indexes.size){0}
-//            var likesCounter = 0
-//            var likesVal :Int? = null
-//            val currentVal = Array<Int?>(indexes.size) { null }
-//            for (i in 0 until indexes.size){
-//                if (indexes[i].size>counters) {
-//                    return@sequence
-//                }
-//                currentVal[i] = indexes[i].next()
-//            }
-//
-//            while (true) {
-//                var allEqual = true
-//                var id2Yield = -1
-//                (0 until indexes.size).forEach { i ->
-//                    val c = currentVal[i]!!
-//                    if (id2Yield == -1) {
-//                        id2Yield = c
-//                    } else {
-//                        if (id2Yield != c) {
-//                            allEqual = false
-//                        }
-//                        if (id2Yield > c) {
-//                            id2Yield = c
-//                        }
-//                    }
-//                }
-//                if (allEqual) {
-//                    yield(id2Yield)
-//                    range.forEach { i ->
-//                        if (!indexes[i].hasNext()) {
-//                            return@sequence
-//                        }
-//                        currentVal[i] = indexes[i].next()
-//                    }
-//                } else {
-//                    range.forEach { i ->
-//                        if (currentVal[i]!! >= id2Yield) {
-//                            while (currentVal[i]!! > id2Yield) {
-//                                if (!indexes[i].hasNext()) {
-//                                    return@sequence
-//                                }
-//                                currentVal[i] = indexes[i].next()
-//                            }
-//
-//                        }
-//                    }
-//                }
-//            }
-        }
 
         val tempGroups = mutableListOf<Group>()
         map.entries.forEach { (sex, statusMap) ->
@@ -491,6 +413,14 @@ class AccountRepositoryImpl : AccountRepository {
 
     override fun recommend(id: Int?, city: String?, country: String?, limit: Int): Sequence<InnerAccount> {
         return emptySequence()
+    }
+
+    private fun fullIdsSequence() = sequence {
+        var id = maxId
+        while (id >= 0) {
+            yield(id)
+            id--
+        }
     }
 }
 
