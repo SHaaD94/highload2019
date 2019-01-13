@@ -9,29 +9,30 @@ CMD ["java", \
      "-XX:+UseG1GC",\
 \
 #     "-XX:+PrintGCDetails",\
-     "-XX:+PrintGCApplicationStoppedTime",\
-     "-XX:+PrintGCTimeStamps",\
+     "-XX:+ShowMessageBoxOnError",\
+#     "-XX:+PrintGCApplicationStoppedTime",\
+#     "-XX:+PrintGCTimeStamps",\
 \
      "-Djava.lang.Integer.IntegerCache.high=1700000",\
 \
-     "-XX:ParallelGCThreads=8",\
-     "-XX:InitiatingHeapOccupancyPercent=40", \
+     "-XX:ParallelGCThreads=2",\
+#     "-XX:InitiatingHeapOccupancyPercent=40", \
      "-XX:MaxGCPauseMillis=500",\
      "-XX:G1ReservePercent=5",\
 \
-     "-XX:+OptimizeStringConcat",\
-     "-XX:+EliminateLocks",\
-     "-XX:+UseCompressedOops",\
+#     "-XX:+OptimizeStringConcat",\
+#     "-XX:+EliminateLocks",\
+#     "-XX:+UseCompressedOops",\
 \
 \
      "-XX:MaxMetaspaceSize=64m",\
-     "-XX:SurvivorRatio=6",\
+#     "-XX:SurvivorRatio=6",\
 \
      "-XX:MaxNewSize=300m",\
      "-XX:NewSize=300m",\
-     "-XX:-UseAdaptiveSizePolicy",\
+#     "-XX:-UseAdaptiveSizePolicy",\
 \
-     "-Xmx1400m",\
-     "-Xms1400m",\
+     "-Xmx1300m",\
+     "-Xms1300m",\
 \
      "-jar", "app.jar"]

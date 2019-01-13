@@ -1,7 +1,5 @@
 package com.shaad.highload2018.web.get
 
-import com.google.common.primitives.Chars
-import com.google.common.primitives.Ints
 import com.google.inject.Inject
 import com.shaad.highload2018.repository.*
 import com.shaad.highload2018.utils.ByteArrayBuilder
@@ -124,12 +122,12 @@ class AccountsFilter @Inject constructor(private val repository: AccountReposito
                     bytes.append(acc.birth.toString().toByteArray())
                 }
                 if (filterRequest.premium != null) {
-                    if (acc.premium != null) {
+                    if (acc.premiumStart != null) {
                         bytes.append(comma)
                         bytes.append(premiumStart)
-                        bytes.append(acc.premium.start.toString().toByteArray())
+                        bytes.append(acc.premiumStart.toString().toByteArray())
                         bytes.append(premiumFinish)
-                        bytes.append(acc.premium.finish.toString().toByteArray())
+                        bytes.append(acc.premiumFinish.toString().toByteArray())
                         bytes.append(figuredBracketClose)
                     }
                 }

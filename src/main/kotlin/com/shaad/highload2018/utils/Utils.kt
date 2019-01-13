@@ -1,13 +1,8 @@
 package com.shaad.highload2018.utils
 
-import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
-import java.io.ObjectInputStream
-import java.io.ObjectOutputStream
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.*
-import java.util.concurrent.ConcurrentHashMap
 
 val moscowTimeZone = ZoneOffset.ofHours(3)
 fun parsePhoneCode(phone: String): String {
@@ -28,35 +23,6 @@ fun parsePhoneCode(phone: String): String {
     throw RuntimeException("Failed to parse code of phone $phone")
 }
 
-fun <K> concurrentHashSet(capacity: Int = 16): MutableSet<K> = ConcurrentHashMap.newKeySet(capacity)
-
-fun <K> emptyMutableSet(): MutableSet<K> = mutableSet as MutableSet<K>
-val mutableSet = mutableSetOf<Nothing>()
-
-fun now() = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC)
-
-fun <T> customIntersects(
-    sourceCollection: Collection<T>,
-    vararg collections: Collection<T>
-): Collection<T> {
-    val notSourceCollection = collections.filter { it !== sourceCollection }
-    if (notSourceCollection.isEmpty()) return sourceCollection
-    return notSourceCollection.reduce { ac, collection -> ac.intersect(collection) }
-}
-
-
-fun convertToBytes(`object`: Any): ByteArray {
-    ByteArrayOutputStream().use { bos ->
-        ObjectOutputStream(bos).use { out ->
-            out.writeObject(`object`)
-            return bos.toByteArray()
-        }
-    }
-}
-
-inline fun <reified T> convertFromBytes(bytes: ByteArray): T =
-    ByteArrayInputStream(bytes).use { bis -> ObjectInputStream(bis).use { `in` -> `in`.readObject() as T } }
-
 
 fun <T> measureTimeAndReturnResult(opName: String = "", block: () -> T): T {
     val start = System.currentTimeMillis()
@@ -64,6 +30,18 @@ fun <T> measureTimeAndReturnResult(opName: String = "", block: () -> T): T {
     (System.currentTimeMillis() - start).let {
         if (it > 100) {
             println("$opName $it")
+        }
+
+    }
+    return res
+}
+
+fun <T> measureTimeAndReturnResultLazy(opName: () -> String = { "" }, block: () -> T): T {
+    val start = System.currentTimeMillis()
+    val res = block()
+    (System.currentTimeMillis() - start).let {
+        if (it > 100) {
+            println("${opName()} $it")
         }
 
     }
@@ -111,8 +89,22 @@ fun joinIterators(indexes: List<Iterator<Int>>) = iterator {
         }
     }
     while (true) {
-        val maxValue = currentVal.asSequence().filter { it != null }.maxBy { it!! } ?: return@iterator
-        yield(maxValue)
+        var maxValue: Int? = null
+        currentVal.forEach {
+            if (it == null) {
+                return@forEach
+            }
+            if (maxValue == null) {
+                maxValue = it
+            }
+            if (maxValue!! < it) {
+                maxValue = it
+            }
+        }
+        if (maxValue == null) {
+            return@iterator
+        }
+        yield(maxValue!!)
         range.forEach { it ->
             val c = currentVal[it] ?: return@forEach
             if (c == maxValue) {
@@ -183,10 +175,18 @@ fun generateSequenceFromIndexes(indexes: List<Iterator<Int>>): Sequence<Int> = s
     }
 }
 
+fun <T> List<T>.myIterator() = iterator {
+    var thisSize = this@myIterator.size
+    var i = 0
+    while (i < thisSize) {
+        yield(this@myIterator[i])
+        i++
+    }
+}
 
 fun getIterator(array: Array<ArrayList<Int>>?): Iterator<Int> {
     array ?: return emptyIterator()
-    val resultIterators = array.filter { !it.isEmpty() }.map { it.iterator() }
+    val resultIterators = array.filter { !it.isEmpty() }.map { it.myIterator() }
     return joinIterators(resultIterators)
 }
 
@@ -205,12 +205,10 @@ fun searchClosest(target: Int, nums: ArrayList<Int>): Int {
     while (i <= j) {
         val mid = (i + j) / 2
 
-        if (target < nums[mid]) {
-            i = mid + 1
-        } else if (target > nums[mid]) {
-            j = mid - 1
-        } else {
-            return mid
+        when {
+            target < nums[mid] -> i = mid + 1
+            target > nums[mid] -> j = mid - 1
+            else -> return mid
         }
     }
 

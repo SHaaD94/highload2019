@@ -17,9 +17,6 @@ interface AccountRepository {
 
 class AccountRepositoryImpl : AccountRepository {
     @Volatile
-    private var ids = (1_700_000 downTo 0)
-
-    @Volatile
     private var maxId = 0
 
     override fun addAccount(account: Account) {
@@ -37,7 +34,8 @@ class AccountRepositoryImpl : AccountRepository {
                 account.country?.let { writeNormalizationIndex(countries, countriesInv, it) },
                 account.birth,
                 account.phone?.toByteArray(),
-                account.premium,
+                account.premium?.start,
+                account.premium?.finish,
                 account.interests?.map { writeNormalizationIndex(interests, interestsInv, it) }
                 //account.likes?.map {  InnerLike(it) }
             )
@@ -153,8 +151,9 @@ class AccountRepositoryImpl : AccountRepository {
 
         if (account.id > maxId) {
             synchronized(maxId) {
-                maxId = account.id
-                ids = (maxId downTo 0)
+                if (account.id > maxId) {
+                    maxId = account.id
+                }
             }
         }
     }
@@ -230,15 +229,19 @@ class AccountRepositoryImpl : AccountRepository {
 
                 val ltIterator = getIterator(birthIndex[ltY])
                 if (lt == null) ltIterator else {
-                    ltIterator.asSequence().filter { getAccountByIndex(it)!!.birth <= lt }
-                        .iterator()
+                    ltIterator.asSequence().filter {
+                        val acc = getAccountByIndex(it)!!
+                        acc.birth <= lt
+                    }.iterator()
                 }.let { iterators.add(it) }
 
 
                 val gtIterator = getIterator(birthIndex[gtY])
                 if (gt == null) gtIterator else {
-                    gtIterator.asSequence().filter { getAccountByIndex(it)!!.birth >= gt }
-                        .iterator()
+                    gtIterator.asSequence().filter {
+                        val acc = getAccountByIndex(it)!!
+                        acc.birth >= gt
+                    }.iterator()
                 }.let { iterators.add(it) }
 
                 indexes.add(joinIterators(iterators))
@@ -260,11 +263,11 @@ class AccountRepositoryImpl : AccountRepository {
 
         filterRequest.likes?.let { (contains) ->
             contains?.let { likes ->
-                likes.asSequence().map { getLikesByIndex(it).iterator() }.forEach { indexes.add(it) }
+                likes.asSequence().map { getLikesByIndex(it).myIterator() }.forEach { indexes.add(it) }
             }
         }
 
-        val sequence = if (indexes.isEmpty()) ids.asSequence() else generateSequenceFromIndexes(indexes)
+        val sequence = if (indexes.isEmpty()) fullIdsSequence() else generateSequenceFromIndexes(indexes)
 
         return sequence
             .mapNotNull { getAccountByIndex(it) }
@@ -287,7 +290,7 @@ class AccountRepositoryImpl : AccountRepository {
                         filterByNull(filterRequest.phone?.nill, id.phone) &&
                         filterByNull(filterRequest.country?.nill, id.country) &&
                         filterByNull(filterRequest.city?.nill, id.city) &&
-                        filterByNull(filterRequest.premium?.nill, id.premium)
+                        filterByNull(filterRequest.premium?.nill, id.premiumStart)
             }
             .take(filterRequest.limit)
     }
@@ -319,7 +322,7 @@ class AccountRepositoryImpl : AccountRepository {
             }
             joinedIndex[mappedYear]
         }?.let { indexes.add(getIterator(it)) }
-        groupRequest.likes?.let { getLikesByIndex(it) }?.let { indexes.add(it.iterator()) }
+        groupRequest.likes?.let { getLikesByIndex(it) }?.let { indexes.add(it.myIterator()) }
 
         val useSex = groupRequest.keys.contains("sex")
         val useStatus = groupRequest.keys.contains("status")
@@ -327,7 +330,7 @@ class AccountRepositoryImpl : AccountRepository {
         val useCountry = groupRequest.keys.contains("country")
         val useCity = groupRequest.keys.contains("city")
 
-        val sequence = if (indexes.isEmpty()) ids.asSequence() else generateSequenceFromIndexes(indexes)
+        val sequence = if (indexes.isEmpty()) fullIdsSequence() else generateSequenceFromIndexes(indexes)
 
         //sex->status->country->city->interests
         val map =
@@ -410,6 +413,14 @@ class AccountRepositoryImpl : AccountRepository {
 
     override fun recommend(id: Int?, city: String?, country: String?, limit: Int): Sequence<InnerAccount> {
         return emptySequence()
+    }
+
+    private fun fullIdsSequence() = sequence {
+        var id = maxId
+        while (id >= 0) {
+            yield(id)
+            id--
+        }
     }
 }
 

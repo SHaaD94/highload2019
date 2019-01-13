@@ -4,10 +4,15 @@ import com.squareup.okhttp.MediaType
 import com.squareup.okhttp.OkHttpClient
 import com.squareup.okhttp.Request
 import com.squareup.okhttp.RequestBody
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 class Heater {
-    val client = OkHttpClient()
+    private val client = OkHttpClient()
     fun warmUp() {
         client.setConnectTimeout(2, TimeUnit.MINUTES)
         client.setReadTimeout(2, TimeUnit.MINUTES)
@@ -15,24 +20,23 @@ class Heater {
 
         val localhost = "http://127.0.0.1"
 
-        listOf(
-            "$localhost/accounts/filter/?city_any=Зеленодорф,Амстеровск,Волостан&sex_eq=f&interests_any=Рэп,Бокс,Целоваться&limit=4",
-            "$localhost/accounts/filter/?city_eq=Лесогама&limit=30",
-            "$localhost/accounts/filter/?sex_eq=f&country_eq=Росания&limit=24",
-            "$localhost/accounts/filter/?sex_eq=m&birth_gt=773949382&country_null=0&status_neq=свободны&limit=10",
-            "$localhost/accounts/group/?keys=city&order=-1&status=свободны&limit=50",
-            "$localhost/accounts/group/?keys=interests&order=1&birth=1999&limit=10",
-            "$localhost/accounts/10048/suggest/?city=Рособирск&limit=10",
-            "$localhost/accounts/18111/suggest/?country=Росизия&limit=12",
-            "$localhost/accounts/10439/recommend/?city=Амстеродам&limit=20",
-            "$localhost/accounts/11084/recommend/?country=Росмаль&limit=16"
-        ).forEach { url -> repeat(100) { get(url) } }
-
-        listOf(
-            "$localhost/accounts/10178/?query_id=18",
-            "$localhost/accounts/10544/?query_id=8",
-            "$localhost/accounts/likes/?query_id=11"
-        ).forEach { url -> repeat(10) { post(url) } }
+//        listOf(
+//            "$localhost/accounts/filter/?city_any=Зеленодорф,Амстеровск,Волостан&sex_eq=f&interests_any=Рэп,Бокс,Целоваться&limit=4",
+//            "$localhost/accounts/filter/?limit=10&city_null=0&sex_eq=f&email_domain=mail.ru&premium_null=1&birth_year=1994&status_neq=1",
+//            "$localhost/accounts/filter/?sex_eq=m&birth_gt=773949382&country_null=0&status_neq=свободны&limit=10",
+//            "$localhost/accounts/group/?keys=city&order=-1&status=свободны&limit=50",
+//            "$localhost/accounts/group/?keys=interests&order=1&birth=1999&limit=10",
+//            "$localhost/accounts/10048/suggest/?city=Рособирск&limit=10",
+//            "$localhost/accounts/18111/suggest/?country=Росизия&limit=12",
+//            "$localhost/accounts/10439/recommend/?city=Амстеродам&limit=20",
+//            "$localhost/accounts/11084/recommend/?country=Росмаль&limit=16"
+//        ).forEach { url -> repeat(100) { get(url) } }
+//
+//        listOf(
+//            "$localhost/accounts/10178/?query_id=18",
+//            "$localhost/accounts/10544/?query_id=8",
+//            "$localhost/accounts/likes/?query_id=11"
+//        ).forEach { url -> repeat(10) { post(url) } }
 
         println("Warmed up!")
     }
@@ -54,5 +58,16 @@ class Heater {
                     it.body().close()
                 }
             }
+    }
+}
+
+fun main(args: Array<String>) {
+    val context = Executors.newFixedThreadPool(32).asCoroutineDispatcher()
+    runBlocking {
+        (0..100).map {
+            launch(context) {
+                (0..1000).forEach { Heater().warmUp() }
+            }
+        }
     }
 }

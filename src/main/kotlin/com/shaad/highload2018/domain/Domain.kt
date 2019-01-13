@@ -54,7 +54,8 @@ class InnerAccount(
     val country: Int?,
     val birth: Int,
     val phone: ByteArray?,
-    val premium: Premium?,
+    val premiumStart: Int?,
+    val premiumFinish: Int?,
     val interests: List<Int>?/*,
     val likes: List<InnerLike>?*/
 )

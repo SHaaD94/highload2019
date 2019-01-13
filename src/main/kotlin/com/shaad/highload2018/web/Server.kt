@@ -1,7 +1,6 @@
 package com.shaad.highload2018.web
 
 import com.google.inject.Inject
-import com.shaad.highload2018.utils.measureTimeAndReturnResult
 import org.rapidoid.buffer.Buf
 import org.rapidoid.config.Conf
 import org.rapidoid.http.AbstractHttpServer
@@ -37,25 +36,23 @@ class Server @Inject constructor(
         return method2Handler[method]
             ?.firstOrNull { it.matches(buf, data.path) }
             ?.let { handler ->
-                measureTimeAndReturnResult(buf[data.path]) {
-                    kotlin.runCatching { handler.process(buf, data.path, data.query, data.body) }
-                        .onSuccess {
-                            startResponse(ctx, it.code, true)
-                            writeBody(ctx, it.body, 0, it.body.size, json)
-                        }
-                        .onFailure { error ->
-                            error.printStackTrace()
-                            startResponse(ctx, 500, true)
-                            writeBody(
-                                ctx,
-                                error.message?.toByteArray() ?: "Internal server error".toByteArray(),
-                                0,
-                                error.message?.toByteArray()?.size ?: 21,
-                                json
-                            )
-                        }.getOrNull()
-                    HttpStatus.DONE
-                }
+                kotlin.runCatching { handler.process(buf, data.path, data.query, data.body) }
+                    .onSuccess {
+                        startResponse(ctx, it.code, true)
+                        writeBody(ctx, it.body, 0, it.body.size, json)
+                    }
+                    .onFailure { error ->
+                        error.printStackTrace()
+                        startResponse(ctx, 500, true)
+                        writeBody(
+                            ctx,
+                            error.message?.toByteArray() ?: "Internal server error".toByteArray(),
+                            0,
+                            error.message?.toByteArray()?.size ?: 21,
+                            json
+                        )
+                    }.getOrNull()
+                HttpStatus.DONE
             }
             ?: HttpStatus.NOT_FOUND
     }

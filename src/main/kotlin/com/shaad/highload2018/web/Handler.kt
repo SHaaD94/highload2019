@@ -34,7 +34,6 @@ abstract class HandlerBase : Handler {
         return buf[paramsRange]
             .split("&")
             .map { it.split("=") }
-            .filter { it.size == 2 }
             .map { it[0] to Msc.urlDecodeOrKeepOriginal(it[1]) }
             .toMap()
     }
