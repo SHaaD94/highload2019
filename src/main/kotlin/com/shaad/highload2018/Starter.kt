@@ -6,6 +6,7 @@ import com.shaad.highload2018.configuration.BaseModule
 import com.shaad.highload2018.utils.measureTimeAndReturnResult
 import com.shaad.highload2018.web.Server
 import kotlin.concurrent.fixedRateTimer
+import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
     val injector = Guice.createInjector(

@@ -174,18 +174,9 @@ fun generateSequenceFromIndexes(indexes: List<Iterator<Int>>): Sequence<Int> = s
     }
 }
 
-fun <T> List<T>.myIterator() = iterator {
-    var thisSize = this@myIterator.size
-    var i = 0
-    while (i < thisSize) {
-        yield(this@myIterator[i])
-        i++
-    }
-}
-
 fun getIterator(array: Array<ArrayList<Int>>?): Iterator<Int> {
     array ?: return emptyIterator()
-    val resultIterators = array.filter { !it.isEmpty() }.map { it.myIterator() }
+    val resultIterators = array.filter { !it.isEmpty() }.map { it.iterator() }
     return joinIterators(resultIterators)
 }
 

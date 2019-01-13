@@ -22,7 +22,7 @@ class Server @Inject constructor(
         TCP.server(Conf.HTTP)
             .protocol(this)
             .blockingAccept(false)
-            .noDelay(true)
+            .noDelay(false)
             .syncBufs(false)
             .workers(4)
             .address(address)

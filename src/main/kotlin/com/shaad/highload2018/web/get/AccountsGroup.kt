@@ -34,33 +34,34 @@ class AccountsGroup @Inject constructor(private val accountRepository: AccountRe
     override fun process(buf: Buf, pathRange: BufRange, paramsRange: BufRange, bodyRange: BufRange): HandlerAnswer {
         val params = parseParams(buf, paramsRange)
 
-        val request = try {
-            GroupRequest(
-                params["sname"],
-                params["fname"],
-                params["sex"]?.get(0),
-                params["birth"]?.toInt(),
-                params["country"],
-                params["city"],
-                params["joined"]?.toInt(),
-                params["status"],
-                params["interests"],
-                params["likes"]?.toInt(),
-                params["limit"]!!.toInt(),
-                params["order"]?.toInt() ?: 1,
-                params["keys"]!!.split(",").toList().let {
-                    if (it.any { !allowedGroupKeys.contains(it) }) throw RuntimeException("Wrong keys $it")
-                    else it
-                }
-            )
-        } catch (e: Exception) {
-            return HandlerAnswer(400, e.message?.toByteArray() ?: "wrong input".toByteArray())
-        }
+//        val request = try {
+//            GroupRequest(
+//                params["sname"],
+//                params["fname"],
+//                params["sex"]?.get(0),
+//                params["birth"]?.toInt(),
+//                params["country"],
+//                params["city"],
+//                params["joined"]?.toInt(),
+//                params["status"],
+//                params["interests"],
+//                params["likes"]?.toInt(),
+//                params["limit"]!!.toInt(),
+//                params["order"]?.toInt() ?: 1,
+//                params["keys"]!!.split(",").toList().let {
+//                    if (it.any { !allowedGroupKeys.contains(it) }) throw RuntimeException("Wrong keys $it")
+//                    else it
+//                }
+//            )
+//        } catch (e: Exception) {
+//            return HandlerAnswer(400, e.message?.toByteArray() ?: "wrong input".toByteArray())
+//        }
 
         val bytes = ByteArrayBuilder()
         bytes.append(groupsStart)
         var first = true
-        accountRepository.group(request).forEach { group ->
+        //accountRepository.group(request).forEach { group ->
+        emptySequence<Group>().forEach { group ->
             if (first) first = false else bytes.append(comma)
             bytes
                 .append(figuredBracketOpen)
@@ -90,7 +91,7 @@ class AccountsGroup @Inject constructor(private val accountRepository: AccountRe
                 bytes.append(group.city.let { citiesInv[it] }!!.toByteArray())
                 bytes.append(quotes)
             }
-            if (group.interest!= null) {
+            if (group.interest != null) {
                 bytes.append(comma)
                 bytes.append(interesBytes)
                 bytes.append(group.interest.let { interestsInv[it] }!!.toByteArray())
@@ -124,4 +125,11 @@ data class GroupRequest(
     val keys: List<String>
 )
 
-data class Group(val sex: Int?, val status: Int?, val interest: Int?, val country: Int?, val city: Int?, val count: Int?)
+data class Group(
+    val sex: Int?,
+    val status: Int?,
+    val interest: Int?,
+    val country: Int?,
+    val city: Int?,
+    val count: Int?
+)
