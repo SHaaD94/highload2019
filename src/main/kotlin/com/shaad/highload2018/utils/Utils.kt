@@ -28,10 +28,9 @@ fun <T> measureTimeAndReturnResult(opName: String = "", block: () -> T): T {
     val start = System.currentTimeMillis()
     val res = block()
     (System.currentTimeMillis() - start).let {
-        if (it > 100) {
+        if (it > 1000) {
             println("$opName $it")
         }
-
     }
     return res
 }

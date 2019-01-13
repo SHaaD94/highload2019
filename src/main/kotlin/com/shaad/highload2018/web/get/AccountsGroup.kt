@@ -124,4 +124,4 @@ data class GroupRequest(
     val keys: List<String>
 )
 
-data class Group(val sex: Int?, val status: Int?, val interest: Int?, val country: Int?, val city: Int?, val count: Int)
+data class Group(val sex: Int?, val status: Int?, val interest: Int?, val country: Int?, val city: Int?, val count: Int?)

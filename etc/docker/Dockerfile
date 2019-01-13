@@ -1,4 +1,4 @@
-FROM frolvlad/alpine-oraclejdk8:slim
+FROM openjdk:latest
 
 EXPOSE 80
 
@@ -28,11 +28,11 @@ CMD ["java", \
      "-XX:MaxMetaspaceSize=64m",\
 #     "-XX:SurvivorRatio=6",\
 \
-     "-XX:MaxNewSize=300m",\
-     "-XX:NewSize=300m",\
+     "-XX:MaxNewSize=100m",\
+     "-XX:NewSize=100m",\
 #     "-XX:-UseAdaptiveSizePolicy",\
 \
-     "-Xmx1300m",\
-     "-Xms1300m",\
+     "-Xmx1100m",\
+     "-Xms1100m",\
 \
      "-jar", "app.jar"]

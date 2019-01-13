@@ -334,7 +334,7 @@ class AccountRepositoryImpl : AccountRepository {
 
         //sex->status->country->city->interests
         val map =
-            mutableMapOf<Int?, MutableMap<Int?, MutableMap<Int?, MutableMap<Int?, MutableMap<Int?, Int>>>>>()
+            mutableMapOf<Int?, MutableMap<Int?, MutableMap<Int?, MutableMap<Int?, MutableMap<Int?, Int?>>>>>()
         sequence
             .mapNotNull { getAccountByIndex(it) }
             .forEach { acc ->
