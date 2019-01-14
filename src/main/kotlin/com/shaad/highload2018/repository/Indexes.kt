@@ -123,7 +123,7 @@ fun getLexIndex(char: Char) = when (char) {
     else -> throw RuntimeException("Unknown char $char")
 }
 
-fun getLikesByIndex(likeId: Int): ArrayList<Int> =
+fun getLikesByIndex(likeId: Int): ArrayList<Int>? =
     when {
         likeId < 250_000 -> likeIndex0_250[likeId]
         likeId in 250_000 until 500_000 -> likeIndex250_500[likeId - 250_000]
@@ -131,7 +131,7 @@ fun getLikesByIndex(likeId: Int): ArrayList<Int> =
         likeId in 750_000 until 1_000_000 -> likeIndex750_1000[likeId - 750_000]
         likeId in 1_000_000 until 1_300_000 -> likeIndex1000_1300[likeId - 1_000_000]
 
-        else -> likeIndex1300[likeId]!!
+        else -> likeIndex1300[likeId]
     }
 
 fun getAccountByIndex(id: Int): InnerAccount? = when {

@@ -263,7 +263,7 @@ class AccountRepositoryImpl : AccountRepository {
 
         filterRequest.likes?.let { (contains) ->
             contains?.let { likes ->
-                likes.asSequence().map { getLikesByIndex(it).iterator() }.forEach { indexes.add(it) }
+                likes.asSequence().map { getLikesByIndex(it)?.iterator()?: emptyIterator() }.forEach { indexes.add(it) }
             }
         }
 
@@ -415,13 +415,5 @@ class AccountRepositoryImpl : AccountRepository {
         return emptySequence()
     }
 
-    private fun fullIdsSequence() = sequence {
-        var id = maxId
-        while (id >= 0) {
-            yield(id)
-            id--
-        }
-    }
+    private fun fullIdsSequence() = (maxId downTo 0).asSequence()
 }
-
-
