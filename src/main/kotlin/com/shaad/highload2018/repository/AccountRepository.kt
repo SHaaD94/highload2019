@@ -381,55 +381,59 @@ class AccountRepositoryImpl : AccountRepository {
 
         val result = ArrayList<Group>(groupRequest.limit)
         var i = 0
-        while (i < groupRequest.limit || i == tempGroups.size) {
+        while (i < groupRequest.limit && i < tempGroups.size) {
             var resGroup: Group? = null
             var j = 0
-            val c = tempGroups[j]
             elemLoop@ while (j < tempGroups.size) {
+                val c = tempGroups[j]
+                if (result.contains(c)) {
+                    j++
+                    continue
+                }
+
                 if (resGroup == null) {
                     resGroup = c
                     j++
                     continue
                 }
-                if (resGroup != c) {
-                    val countComparison = resGroup.count!! - c.count!!
-                    if (result.contains(resGroup)) {
-                        j++
-                        continue
-                    }
-                    if (countComparison < 0 && groupRequest.order > 0) {
-                        result.add(resGroup)
-                    }
-                    if (countComparison > 0 && groupRequest.order < 0) {
-                        result.add(resGroup)
-                    }
 
-                    if (countComparison == 0) {
-                        val propertyCounter = 0
+                if (resGroup !== c) {
+                    val countComparison = resGroup.count!! - c.count!!
+                    if (countComparison < 0 && groupRequest.order < 0) {
+                        resGroup = c
+                    } else if (countComparison > 0 && groupRequest.order > 0) {
+                        resGroup = c
+                    } else if (countComparison == 0) {
+                        var propertyCounter = 0
                         propertyLoop@ while (propertyCounter < 5) {
                             val resString = getGroupComparingString(groupRequest, countComparison, resGroup!!)
-                            if (resString == null) {
-                                result.add(resGroup)
-                                break@elemLoop
-                            }
                             val cString = getGroupComparingString(groupRequest, countComparison, c)
-                            if (cString == null) {
-                                result.add(c)
-                                break@elemLoop
+                            if (resString == null && cString != null) {
+                                break@propertyLoop
+                            }
+                            if (cString == null && resString != null) {
+                                resGroup = c
+                                break@propertyLoop
+                            }
+                            if (cString == resString) {
+                                propertyCounter++
+                                continue@propertyLoop
+                            }
+                            if (cString!! > resString!! && groupRequest.order < 0) {
+                                resGroup = c
+                                break@propertyLoop
                             }
                             if (cString < resString && groupRequest.order > 0) {
                                 resGroup = c
-                                break
+                                break@propertyLoop
                             }
-                            if (cString > resString && groupRequest.order < 0) {
-                                resGroup = c
-                                break
-                            }
+                            break@propertyLoop
                         }
                     }
                 }
                 j++
             }
+            result.add(resGroup!!)
             i++
         }
 
@@ -462,6 +466,18 @@ class AccountRepositoryImpl : AccountRepository {
 
 
     override fun recommend(id: Int?, city: String?, country: String?, limit: Int): Sequence<InnerAccount> {
+        val id = getAccountByIndex(id!!) ?: throw RuntimeException("User $id not found")
+
+        val otherSex = sexIndex[if (id.sex == 0) 'm' else 'f']!!
+        val premiumIndex = premiumNowIndex
+
+        val countryIndex = countries[country]?.let { countryIndex[it]!! }
+        val cityIndex = cities[city]?.let { cityIndex[it]!! }
+
+
+
+
+
         return emptySequence()
     }
 

@@ -15,7 +15,7 @@ CMD ["java", \
 \
      "-Djava.lang.Integer.IntegerCache.high=1700000",\
 \
-     "-XX:ParallelGCThreads=2",\
+     "-XX:ParallelGCThreads=4",\
 #     "-XX:InitiatingHeapOccupancyPercent=40", \
      "-XX:MaxGCPauseMillis=500",\
      "-XX:G1ReservePercent=5",\
@@ -23,6 +23,7 @@ CMD ["java", \
 #     "-XX:+OptimizeStringConcat",\
 #     "-XX:+EliminateLocks",\
 #     "-XX:+UseCompressedOops",\
+     "-XX:CompileThreshold=10",\
 \
 \
      "-XX:MaxMetaspaceSize=64m",\
@@ -32,7 +33,7 @@ CMD ["java", \
      "-XX:NewSize=500m",\
 #     "-XX:-UseAdaptiveSizePolicy",\
 \
-     "-Xmx1600m",\
-     "-Xms1600m",\
+     "-Xmx1300m",\
+     "-Xms1300m",\
 \
      "-jar", "app.jar"]

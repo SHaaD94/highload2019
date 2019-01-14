@@ -5,6 +5,7 @@ import com.google.inject.Stage
 import com.shaad.highload2018.configuration.BaseModule
 import com.shaad.highload2018.utils.measureTimeAndReturnResult
 import com.shaad.highload2018.web.Server
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.fixedRateTimer
 import kotlin.system.exitProcess
 
@@ -14,8 +15,10 @@ fun main(args: Array<String>) {
         BaseModule()
     )
 
-    fixedRateTimer("dump memory", false, 0, 1_000) {
-        println("Current free memory is ${Runtime.getRuntime().freeMemory()} of ${Runtime.getRuntime().totalMemory()} (max ${Runtime.getRuntime().maxMemory()})")
+    fixedRateTimer("dump memory", false, 1_000, 5_000) {
+        ProcessBuilder("awk '/^Mem/ {printf(\"%u%%\", 100*\$3/\$2);}' <(free -m)")
+            .start()
+            .inputStream.reader().readText().let { "Used memory $it" }
     }
 
     measureTimeAndReturnResult("Filling is finished in") {
