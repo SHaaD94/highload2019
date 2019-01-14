@@ -10,7 +10,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 
 fun main(args: Array<String>) {
-    val localhost = "http://127.0.0.1"
+    val localhost = "http://127.0.0.1:8080"
 
     val urls = listOf(
         "$localhost/accounts/filter/?city_any=Зеленодорф,Амстеровск,Волостан&sex_eq=f&interests_any=Рэп,Бокс,Целоваться&limit=4",
@@ -35,7 +35,7 @@ fun main(args: Array<String>) {
             launch(context) {
                 val client = OkHttpClient()
                 while (true) {
-                    if (counter.get() > 10_000) {
+                    if (counter.get() > 1_000) {
                         continue
                     }
                     val call = client.newCall(
@@ -44,15 +44,21 @@ fun main(args: Array<String>) {
                     )
 
                     counter.incrementAndGet()
-                    call.enqueue(object : Callback {
-                        override fun onFailure(request: Request?, e: IOException?) {
+                    call.execute().let {
+                        it.body().close()
+                        if (it.code()!=200){
                             println(urls[number % urls.size - 1] + " is not successful")
                         }
-
-                        override fun onResponse(response: Response?) {
-                            response!!.body().close()
-                        }
-                    })
+                    }
+//                    call.enqueue(object : Callback {
+//                        override fun onFailure(request: Request?, e: IOException?) {
+//                            println(urls[number % urls.size - 1] + " is not successful")
+//                        }
+//
+//                        override fun onResponse(response: Response?) {
+//                            response!!.body().close()
+//                        }
+//                    })
                 }
 
             }

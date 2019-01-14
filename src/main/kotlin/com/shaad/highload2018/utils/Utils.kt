@@ -76,43 +76,54 @@ object EmptyIterator : Iterator<Nothing> {
 
 fun emptyIterator() = EmptyIterator
 
-fun joinIterators(indexes: List<Iterator<Int>>) = iterator {
+fun joinIterators(indexes: List<Iterator<Int>>) = iterator<Int> {
     if (indexes.isEmpty()) {
         return@iterator
     }
-    val range = (0 until indexes.size)
     val currentVal = Array<Int?>(indexes.size) { null }
-    range.forEach { i ->
+    var i = 0
+    while (i < indexes.size) {
         if (indexes[i].hasNext()) {
             currentVal[i] = indexes[i].next()
         }
+        i++
     }
     while (true) {
         var maxValue: Int? = null
-        currentVal.forEach {
-            if (it == null) {
-                return@forEach
+        var j = 0
+        while (j < currentVal.size) {
+            if (currentVal[j] == null) {
+                j++
+                continue
             }
+            val it = currentVal[j]
             if (maxValue == null) {
                 maxValue = it
             }
-            if (maxValue!! < it) {
+            if (maxValue!! < it!!) {
                 maxValue = it
             }
+            j++
         }
         if (maxValue == null) {
             return@iterator
         }
-        yield(maxValue!!)
-        range.forEach { it ->
-            val c = currentVal[it] ?: return@forEach
+        yield(maxValue)
+        i = 0
+        while (i < indexes.size) {
+            if (currentVal[i] == null) {
+                i++
+                continue
+            }
+            val c = currentVal[i]
             if (c == maxValue) {
-                currentVal[it] = if (!indexes[it].hasNext()) {
+                currentVal[i] = if (!indexes[i].hasNext()) {
                     null
                 } else {
-                    indexes[it].next()
+                    indexes[i].next()
                 }
             }
+            i++
         }
     }
 }
@@ -125,19 +136,21 @@ fun generateSequenceFromIndexes(indexes: List<Iterator<Int>>): Sequence<Int> = s
     if (indexes.isEmpty()) {
         return@sequence
     }
-    val range = (0 until indexes.size)
+    var i = 0
     val currentVal = Array<Int?>(indexes.size) { null }
-    range.forEach { i ->
+    while (i < indexes.size) {
         if (!indexes[i].hasNext()) {
             return@sequence
         }
         currentVal[i] = indexes[i].next()
+        i++
     }
 
     while (true) {
         var allEqual = true
         var id2Yield = -1
-        (0 until indexes.size).forEach { i ->
+        i = 0
+        while (i < indexes.size) {
             val c = currentVal[i]!!
             if (id2Yield == -1) {
                 id2Yield = c
@@ -149,17 +162,21 @@ fun generateSequenceFromIndexes(indexes: List<Iterator<Int>>): Sequence<Int> = s
                     id2Yield = c
                 }
             }
+            i++
         }
         if (allEqual) {
             yield(id2Yield)
-            range.forEach { i ->
+            i = 0
+            while (i < indexes.size) {
                 if (!indexes[i].hasNext()) {
                     return@sequence
                 }
                 currentVal[i] = indexes[i].next()
+                i++
             }
         } else {
-            range.forEach { i ->
+            i = 0
+            while (i < indexes.size) {
                 if (currentVal[i]!! >= id2Yield) {
                     while (currentVal[i]!! > id2Yield) {
                         if (!indexes[i].hasNext()) {
@@ -167,17 +184,39 @@ fun generateSequenceFromIndexes(indexes: List<Iterator<Int>>): Sequence<Int> = s
                         }
                         currentVal[i] = indexes[i].next()
                     }
-
                 }
+                i++
             }
         }
     }
 }
 
-fun getIterator(array: Array<ArrayList<Int>>?): Iterator<Int> {
+fun getPartitionedIterator(array: Array<ArrayList<Int>>?): Iterator<Int> {
     array ?: return emptyIterator()
-    val resultIterators = array.filter { !it.isEmpty() }.map { it.iterator() }
-    return joinIterators(resultIterators)
+    return object : Iterator<Int> {
+        private var currIterator: Iterator<Int>? = null
+        private var curr = 0
+
+        init {
+            if (!array.isEmpty()) {
+                currIterator = array[curr].iterator()
+            }
+        }
+
+        override fun hasNext() = currIterator?.hasNext() ?: false
+
+        override fun next(): Int {
+            check(currIterator != null)
+            if (currIterator!!.hasNext()) {
+                val e = currIterator!!.next()
+                return e
+            } else {
+                curr++
+                currIterator = if (curr < array.size) array[curr].iterator() else null
+            }
+            throw RuntimeException("Should not be here")
+        }
+    }
 }
 
 fun addToSortedCollection(list: ArrayList<Int>, id: Int?) {
