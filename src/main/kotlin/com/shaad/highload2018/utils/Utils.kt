@@ -8,9 +8,11 @@ val moscowTimeZone = ZoneOffset.ofHours(3)
 fun parsePhoneCode(phone: String): String {
     var code = ""
     var scrapping = false
-    for (i in (0 until phone.length)) {
+    var i = 0
+    while (i < phone.length) {
         if (phone[i] == '(') {
             scrapping = true
+            i++
             continue
         }
         if (phone[i] == ')') {
@@ -19,6 +21,7 @@ fun parsePhoneCode(phone: String): String {
         if (scrapping) {
             code += phone[i]
         }
+        i++
     }
     throw RuntimeException("Failed to parse code of phone $phone")
 }
@@ -45,25 +48,6 @@ fun <T> measureTimeAndReturnResultLazy(opName: () -> String = { "" }, block: () 
 
     }
     return res
-}
-
-class CompositeSet(val sets: Collection<Set<Int>>) : Set<Int> {
-    override val size = sets.sumBy { it.size }
-    override fun containsAll(elements: Collection<Int>): Boolean {
-        TODO("not implemented")
-    }
-
-    override fun isEmpty(): Boolean = sets.all { it.isEmpty() }
-
-    override fun iterator(): Iterator<Int> {
-        TODO("not implemented")
-    }
-
-    override fun spliterator(): Spliterator<Int> {
-        TODO("not implemented")
-    }
-
-    override fun contains(element: Int): Boolean = sets.any { it.contains(element) }
 }
 
 object EmptyIterator : Iterator<Nothing> {
@@ -191,30 +175,30 @@ fun generateSequenceFromIndexes(indexes: List<Iterator<Int>>): Sequence<Int> = s
     }
 }
 
-fun getPartitionedIterator(array: Array<ArrayList<Int>>?): Iterator<Int> {
-    array ?: return emptyIterator()
+fun Array<ArrayList<Int>>?.getPartitionedIterator(): Iterator<Int> {
+    this ?: return emptyIterator()
     return object : Iterator<Int> {
+        private val lists = this@getPartitionedIterator.filter { !it.isEmpty() }
         private var currIterator: Iterator<Int>? = null
         private var curr = 0
 
         init {
-            if (!array.isEmpty()) {
-                currIterator = array[curr].iterator()
+            if (!lists.isEmpty()) {
+                currIterator = lists[curr].iterator()
             }
         }
 
-        override fun hasNext() = currIterator?.hasNext() ?: false
+        override fun hasNext() = (currIterator?.hasNext() ?: false) || curr < lists.size - 1
 
         override fun next(): Int {
             check(currIterator != null)
-            if (currIterator!!.hasNext()) {
-                val e = currIterator!!.next()
-                return e
+            return if (currIterator!!.hasNext()) {
+                currIterator!!.next()
             } else {
                 curr++
-                currIterator = if (curr < array.size) array[curr].iterator() else null
+                currIterator = lists[curr].iterator()
+                currIterator!!.next()
             }
-            throw RuntimeException("Should not be here")
         }
     }
 }

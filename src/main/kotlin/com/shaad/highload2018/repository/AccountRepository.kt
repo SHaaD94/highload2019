@@ -7,6 +7,9 @@ import com.shaad.highload2018.utils.*
 import com.shaad.highload2018.web.get.FilterRequest
 import com.shaad.highload2018.web.get.Group
 import com.shaad.highload2018.web.get.GroupRequest
+import java.util.*
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.collections.ArrayList
 
 interface AccountRepository {
     fun addAccount(account: Account)
@@ -162,56 +165,56 @@ class AccountRepositoryImpl : AccountRepository {
     override fun filter(filterRequest: FilterRequest): Sequence<InnerAccount> {
         val indexes = mutableListOf<Iterator<Int>>()
         filterRequest.email?.let { (domain, _, _) ->
-            if (domain != null) indexes.add(getPartitionedIterator(emailDomainIndex[domain]))
+            if (domain != null) indexes.add(emailDomainIndex[domain].getPartitionedIterator())
         }
         filterRequest.sex?.let { (eq) ->
-            indexes.add(getPartitionedIterator(sexIndex[eq]))
+            indexes.add(sexIndex[eq].getPartitionedIterator())
         }
         filterRequest.premium?.let { (now, _) ->
             if (now != null) {
-                indexes.add(getPartitionedIterator(premiumNowIndex))
+                indexes.add(premiumNowIndex.getPartitionedIterator())
             }
         }
         filterRequest.status?.let { (eq, neq) ->
             if (eq != null) {
-                indexes.add(getPartitionedIterator(statusIndex[statuses[eq]]))
+                indexes.add(statusIndex[statuses[eq]].getPartitionedIterator())
             }
             if (neq != null) {
                 statuses.keys().asSequence().filter { it != neq }.map { statuses[it]!! }
-                    .map { getPartitionedIterator(statusIndex[it]!!) }
+                    .map { statusIndex[it]!!.getPartitionedIterator() }
                     .toList()
                     .let { indexes.add(joinIterators(it)) }
             }
         }
 
         filterRequest.fname?.let { (eq, any, _) ->
-            if (eq != null) indexes.add(getPartitionedIterator(fnames[eq]?.let { fnameIndex[it] }))
+            if (eq != null) indexes.add(fnames[eq]?.let { fnameIndex[it] }.getPartitionedIterator())
             if (any != null) indexes.add(any.map {
-                getPartitionedIterator(fnames[it]?.let { fnameIndex[it] })
+                fnames[it]?.let { fnameIndex[it] }.getPartitionedIterator()
             }.let { joinIterators(it) })
         }
 
         filterRequest.sname?.let { (eq, starts, _) ->
             if (starts != null) {
                 indexes.add(snames.filter { it.key.startsWith(starts) }.map {
-                    getPartitionedIterator(snameIndex[it.value])
+                    snameIndex[it.value].getPartitionedIterator()
                 }.let { joinIterators(it) })
             }
-            if (eq != null) indexes.add(getPartitionedIterator(snames[eq]?.let { snameIndex[it] }))
+            if (eq != null) indexes.add(snames[eq]?.let { snameIndex[it] }.getPartitionedIterator())
         }
 
         filterRequest.phone?.let { (eq, _) ->
-            if (eq != null) indexes.add(getPartitionedIterator(phoneCodeIndex[eq.toInt()]))
+            if (eq != null) indexes.add(phoneCodeIndex[eq.toInt()].getPartitionedIterator())
         }
 
         filterRequest.country?.let { (eq, _) ->
-            if (eq != null) indexes.add(getPartitionedIterator(countries[eq]?.let { countryIndex[it] }))
+            if (eq != null) indexes.add(countries[eq]?.let { countryIndex[it] }.getPartitionedIterator())
         }
 
         filterRequest.city?.let { (eq, any, _) ->
-            if (eq != null) indexes.add(getPartitionedIterator(cities[eq]?.let { cityIndex[it] }))
+            if (eq != null) indexes.add(cities[eq]?.let { cityIndex[it] }.getPartitionedIterator())
             if (any != null) indexes.add(any.map {
-                getPartitionedIterator(cities[it]?.let { cityIndex[it] })
+                cities[it]?.let { cityIndex[it] }.getPartitionedIterator()
             }.let { joinIterators(it) })
         }
 
@@ -223,11 +226,10 @@ class AccountRepositoryImpl : AccountRepository {
 
                 val iterators = (gtY + 1 until ltY).asSequence()
                     .map { birthIndex[it] }
-                    .filter { it.any { !it.isEmpty() } }
-                    .map { getPartitionedIterator(it) }
+                    .map { it.getPartitionedIterator() }
                     .toMutableList()
 
-                val ltIterator = getPartitionedIterator(birthIndex[ltY])
+                val ltIterator = birthIndex[ltY].getPartitionedIterator()
                 if (lt == null) ltIterator else {
                     ltIterator.asSequence().filter {
                         val acc = getAccountByIndex(it)!!
@@ -236,7 +238,7 @@ class AccountRepositoryImpl : AccountRepository {
                 }.let { iterators.add(it) }
 
 
-                val gtIterator = getPartitionedIterator(birthIndex[gtY])
+                val gtIterator = birthIndex[gtY].getPartitionedIterator()
                 if (gt == null) gtIterator else {
                     gtIterator.asSequence().filter {
                         val acc = getAccountByIndex(it)!!
@@ -244,26 +246,28 @@ class AccountRepositoryImpl : AccountRepository {
                     }.iterator()
                 }.let { iterators.add(it) }
 
+                //todo improvements
                 indexes.add(joinIterators(iterators))
             }
 
-            if (year != null) indexes.add(getPartitionedIterator(birthIndex[checkBirthYear(year - 1920)]))
+            if (year != null) indexes.add(birthIndex[checkBirthYear(year - 1920)].getPartitionedIterator())
         }
 
         filterRequest.interests?.let { (contains, any) ->
             contains?.let { containsInterests ->
                 containsInterests.asSequence()
-                    .map { getPartitionedIterator(interests[it]?.let { interestIndex[it] }) }
+                    .map { interests[it]?.let { interestIndex[it] }.getPartitionedIterator() }
                     .forEach { indexes.add(it) }
             }
             any?.let { anyInterests ->
-                anyInterests.map { getPartitionedIterator(interests[it]?.let { interestIndex[it] }) }
+                anyInterests.map { interests[it]?.let { interestIndex[it] }.getPartitionedIterator() }
             }?.let { indexes.add(joinIterators(it)) }
         }
 
         filterRequest.likes?.let { (contains) ->
             contains?.let { likes ->
-                likes.asSequence().map { getLikesByIndex(it)?.iterator()?: emptyIterator() }.forEach { indexes.add(it) }
+                likes.asSequence().map { getLikesByIndex(it)?.iterator() ?: emptyIterator() }
+                    .forEach { indexes.add(it) }
             }
         }
 
@@ -299,19 +303,20 @@ class AccountRepositoryImpl : AccountRepository {
     override fun group(groupRequest: GroupRequest): Sequence<Group> {
         val indexes = mutableListOf<Iterator<Int>>()
 
-        groupRequest.sname?.let { snames[it] }?.let { snameIndex[it] }?.let { indexes.add(getPartitionedIterator(it)) }
-        groupRequest.fname?.let { fnames[it] }?.let { fnameIndex[it] }?.let { indexes.add(getPartitionedIterator(it)) }
-        groupRequest.sex?.let { sexIndex[it] }?.let { indexes.add(getPartitionedIterator(it)) }
+        groupRequest.sname?.let { snames[it] }?.let { snameIndex[it] }?.let { indexes.add(it.getPartitionedIterator()) }
+        groupRequest.fname?.let { fnames[it] }?.let { fnameIndex[it] }?.let { indexes.add(it.getPartitionedIterator()) }
+        groupRequest.sex?.let { sexIndex[it] }?.let { indexes.add(it.getPartitionedIterator()) }
 
-        groupRequest.country?.let { countries[it]?.let { countryIndex[it] } }?.let { indexes.add(getPartitionedIterator(it)) }
-        groupRequest.city?.let { cities[it]?.let { cityIndex[it] } }?.let { indexes.add(getPartitionedIterator(it)) }
-        groupRequest.status?.let { statuses[it] }?.let { statusIndex[it] }?.let { indexes.add(getPartitionedIterator(it)) }
-        groupRequest.interests?.let { interests[it] }?.let { interestIndex[it] }?.let { indexes.add(getPartitionedIterator(it)) }
+        groupRequest.country?.let { countries[it]?.let { countryIndex[it] } }
+            ?.let { indexes.add(it.getPartitionedIterator()) }
+        groupRequest.city?.let { cities[it]?.let { cityIndex[it] } }?.let { indexes.add(it.getPartitionedIterator()) }
+        groupRequest.status?.let { statuses[it] }?.let { statusIndex[it] }
+            ?.let { indexes.add(it.getPartitionedIterator()) }
+        groupRequest.interests?.let { interests[it] }?.let { interestIndex[it] }
+            ?.let { indexes.add(it.getPartitionedIterator()) }
 
-        groupRequest.birthYear?.let { year ->
-            val mappedYear = checkBirthYear(year - 1920)
-            birthIndex[mappedYear]
-        }?.let { indexes.add(getPartitionedIterator(it)) }
+        groupRequest.birthYear?.let { year -> birthIndex[checkBirthYear(year - 1920)] }
+            ?.let { indexes.add(it.getPartitionedIterator()) }
         groupRequest.joinedYear?.let { year ->
             val mappedYear = (year - 2010).let {
                 when {
@@ -321,8 +326,8 @@ class AccountRepositoryImpl : AccountRepository {
                 }
             }
             joinedIndex[mappedYear]
-        }?.let { indexes.add(getPartitionedIterator(it)) }
-        groupRequest.likes?.let { getLikesByIndex(it) }?.let { indexes.add(it.iterator()) }
+        }?.let { indexes.add(it.getPartitionedIterator()) }
+        groupRequest.likes?.let { getLikesByIndex(it) ?: emptyList<Int>() }?.let { indexes.add(it.iterator()) }
 
         val useSex = groupRequest.keys.contains("sex")
         val useStatus = groupRequest.keys.contains("status")
@@ -333,8 +338,9 @@ class AccountRepositoryImpl : AccountRepository {
         val sequence = if (indexes.isEmpty()) fullIdsSequence() else generateSequenceFromIndexes(indexes)
 
         //sex->status->country->city->interests
+        var entries = 0
         val map =
-            mutableMapOf<Int?, MutableMap<Int?, MutableMap<Int?, MutableMap<Int?, MutableMap<Int?, Int?>>>>>()
+            HashMap<Int?, MutableMap<Int?, MutableMap<Int?, MutableMap<Int?, MutableMap<Int?, AtomicInteger>>>>>()
         sequence
             .mapNotNull { getAccountByIndex(it) }
             .forEach { acc ->
@@ -348,53 +354,97 @@ class AccountRepositoryImpl : AccountRepository {
                     countryMap.computeIfAbsent(if (useCity) acc.city else null) { HashMap() }
 
                 val interests = if (useInterest) acc.interests ?: listWithNull else listWithNull
-                interests.forEach { interest -> cityMap.compute(interest) { _, value -> (value ?: 0) + 1 } }
+                interests.forEach { interest ->
+                    cityMap.compute(interest) { _, value ->
+                        if (value == null) {
+                            entries++
+                        }
+                        val v = value ?: AtomicInteger()
+                        v.incrementAndGet()
+                        v
+                    }
+                }
             }
 
-        val tempGroups = mutableListOf<Group>()
+        val tempGroups = ArrayList<Group>(entries)
         map.entries.forEach { (sex, statusMap) ->
             statusMap.forEach { (status, countryMap) ->
                 countryMap.forEach { (country, cityMap) ->
                     cityMap.forEach { city, interests ->
                         interests.forEach { interest, count ->
-                            tempGroups.add(Group(sex, status, interest, country, city, count))
+                            tempGroups.add(Group(sex, status, interest, country, city, count.get()))
                         }
                     }
                 }
             }
         }
 
-        fun getComparator(pos: Int, g: Group): String? =
-            when (groupRequest.keys.getOrNull(pos)) {
-                "sex" -> int2Sex(g.sex).toString()
-                "status" -> g.status?.let { statusesInv[it] }
-                "interests" -> g.interest?.let { interestsInv[it] }
-                "country" -> g.country?.let { countriesInv[it] }
-                "city" -> g.city?.let { citiesInv[it] }
-                else -> null
-            }
+        val result = ArrayList<Group>(groupRequest.limit)
+        var i = 0
+        while (i < groupRequest.limit || i == tempGroups.size) {
+            var resGroup: Group? = null
+            var j = 0
+            val c = tempGroups[j]
+            elemLoop@ while (j < tempGroups.size) {
+                if (resGroup == null) {
+                    resGroup = c
+                    j++
+                    continue
+                }
+                if (resGroup != c) {
+                    val countComparison = resGroup.count!! - c.count!!
+                    if (result.contains(resGroup)) {
+                        j++
+                        continue
+                    }
+                    if (countComparison < 0 && groupRequest.order > 0) {
+                        result.add(resGroup)
+                    }
+                    if (countComparison > 0 && groupRequest.order < 0) {
+                        result.add(resGroup)
+                    }
 
-        val comparator = compareBy<Group>({ it.count },
-            { getComparator(0, it) }, { getComparator(1, it) }, { getComparator(2, it) },
-            { getComparator(3, it) }, { getComparator(4, it) })
-
-        return sequence {
-            var iterations = groupRequest.limit
-            val checkedEntries = mutableListOf<Any>()
-            while (iterations != 0) {
-                val element =
-                    tempGroups
-                        .asSequence()
-                        .filter { e -> checkedEntries.none { e === it } }
-                        .let { groups ->
-                            if (groupRequest.order == 1) groups.minWith(comparator) else groups.maxWith(comparator)
-                        } ?: return@sequence
-                checkedEntries.add(element)
-                iterations--
-                yield(element)
+                    if (countComparison == 0) {
+                        val propertyCounter = 0
+                        propertyLoop@ while (propertyCounter < 5) {
+                            val resString = getGroupComparingString(groupRequest, countComparison, resGroup!!)
+                            if (resString == null) {
+                                result.add(resGroup)
+                                break@elemLoop
+                            }
+                            val cString = getGroupComparingString(groupRequest, countComparison, c)
+                            if (cString == null) {
+                                result.add(c)
+                                break@elemLoop
+                            }
+                            if (cString < resString && groupRequest.order > 0) {
+                                resGroup = c
+                                break
+                            }
+                            if (cString > resString && groupRequest.order < 0) {
+                                resGroup = c
+                                break
+                            }
+                        }
+                    }
+                }
+                j++
             }
+            i++
         }
+
+        return result.asSequence()
     }
+
+    private fun getGroupComparingString(groupRequest: GroupRequest, pos: Int?, g: Group): String? =
+        when (groupRequest.keys.getOrNull(pos!!)) {
+            "sex" -> int2Sex(g.sex).toString()
+            "status" -> g.status?.let { statusesInv[it] }
+            "interests" -> g.interest?.let { interestsInv[it] }
+            "country" -> g.country?.let { countriesInv[it] }
+            "city" -> g.city?.let { citiesInv[it] }
+            else -> null
+        }
 
     private fun checkBirthYear(year: Int): Int = when {
         year > 99 -> 99
