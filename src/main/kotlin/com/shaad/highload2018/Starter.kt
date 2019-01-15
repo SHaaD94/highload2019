@@ -5,9 +5,10 @@ import com.google.inject.Stage
 import com.shaad.highload2018.configuration.BaseModule
 import com.shaad.highload2018.utils.measureTimeAndReturnResult
 import com.shaad.highload2018.web.Server
-import java.util.concurrent.TimeUnit
+import com.wizzardo.tools.json.JsonObject
+import java.lang.management.ManagementFactory
 import kotlin.concurrent.fixedRateTimer
-import kotlin.system.exitProcess
+
 
 fun main(args: Array<String>) {
     val injector = Guice.createInjector(
@@ -16,9 +17,9 @@ fun main(args: Array<String>) {
     )
 
     fixedRateTimer("dump memory", false, 1_000, 5_000) {
-        ProcessBuilder("awk '/^Mem/ {printf(\"%u%%\", 100*\$3/\$2);}' <(free -m)")
-            .start()
-            .inputStream.reader().readText().let { "Used memory $it" }
+        println("-----------------------")
+        println(getMemoryUsage())
+        println("-----------------------")
     }
 
     measureTimeAndReturnResult("Filling is finished in") {
@@ -35,4 +36,40 @@ fun main(args: Array<String>) {
     Heater().warmUp()
 
     System.gc()
+}
+
+
+fun getMemoryUsage(): String {
+    val json = JsonObject()
+    var totalCommited: Long = 0
+    var totalUsed: Long = 0
+    for (pool in ManagementFactory.getMemoryPoolMXBeans()) {
+        val usage = pool.usage
+        totalCommited += usage.committed
+        totalUsed += usage.used
+        json.append(
+            pool.name, JsonObject()
+                .append("commited", usage.committed / 1024 / 1024)
+                .append("used", usage.used / 1024 / 1024)
+        )
+    }
+
+    json.append(
+        "total", JsonObject()
+            .append("commited", totalCommited / 1024 / 1024)
+            .append("used", totalUsed / 1024 / 1024)
+    )
+    val memoryMXBean = ManagementFactory.getMemoryMXBean()
+
+    json.append(
+        "MemoryMXBean.heap", JsonObject()
+            .append("commited", memoryMXBean.heapMemoryUsage.committed / 1024 / 1024)
+            .append("used", memoryMXBean.heapMemoryUsage.used / 1024 / 1024)
+    )
+    json.append(
+        "MemoryMXBean.nonheap", JsonObject()
+            .append("commited", memoryMXBean.nonHeapMemoryUsage.committed / 1024 / 1024)
+            .append("used", memoryMXBean.nonHeapMemoryUsage.used / 1024 / 1024)
+    )
+    return json.toString()
 }
