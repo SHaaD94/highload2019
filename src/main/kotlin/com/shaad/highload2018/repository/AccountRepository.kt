@@ -7,9 +7,6 @@ import com.shaad.highload2018.utils.*
 import com.shaad.highload2018.web.get.FilterRequest
 import com.shaad.highload2018.web.get.Group
 import com.shaad.highload2018.web.get.GroupRequest
-import java.util.*
-import java.util.concurrent.atomic.AtomicInteger
-import kotlin.collections.ArrayList
 
 interface AccountRepository {
     fun addAccount(account: Account)
@@ -28,18 +25,18 @@ class AccountRepositoryImpl : AccountRepository {
         measureTimeAndReturnResult("id index") {
             val innerAccount = InnerAccount(
                 account.id,
-                writeNormalizationIndex(statuses, statusesInv, account.status),
+                writeNormalizationIndex(statuses, statusesInv, statusesIdCounter, account.status),
                 account.email.toByteArray(),
                 if (account.sex == 'm') 0 else 1,
-                account.fname?.let { writeNormalizationIndex(fnames, fnamesInv, it) },
-                account.sname?.let { writeNormalizationIndex(snames, snamesInv, it) },
-                account.city?.let { writeNormalizationIndex(cities, citiesInv, it) },
-                account.country?.let { writeNormalizationIndex(countries, countriesInv, it) },
+                account.fname?.let { writeNormalizationIndex(fnames, fnamesInv, fnamesIdCounter, it) },
+                account.sname?.let { writeNormalizationIndex(snames, snamesInv, snamesIdCounter, it) },
+                account.city?.let { writeNormalizationIndex(cities, citiesInv, citiesIdCounter, it) },
+                account.country?.let { writeNormalizationIndex(countries, countriesInv, countriesIdCounter, it) },
                 account.birth,
                 account.phone?.toByteArray(),
                 account.premium?.start,
                 account.premium?.finish,
-                account.interests?.map { writeNormalizationIndex(interests, interestsInv, it) }
+                account.interests?.map { writeNormalizationIndex(interests, interestsInv, interestsIdCounter, it) }
                 //account.likes?.map {  InnerLike(it) }
             )
             when {
@@ -53,26 +50,25 @@ class AccountRepositoryImpl : AccountRepository {
         }
 
         measureTimeAndReturnResult("sex index:") {
-            val collection = sexIndex.computeIfAbsent(account.sex) { Array(20) { ArrayList<Int>() } }
+            val collection = sexIndex[sex2Int(account.sex)]
             addToSortedCollection(getIdBucket(account.id, collection), account.id)
         }
 
         measureTimeAndReturnResult("status index:") {
-            val collection =
-                statusIndex.computeIfAbsent(statuses[account.status]!!) { Array(20) { ArrayList<Int>() } }
+            val collection = statusIndex[statuses[account.status]!!]
             addToSortedCollection(getIdBucket(account.id, collection), account.id)
         }
 
         measureTimeAndReturnResult("fname index:") {
             account.fname?.let {
-                val collection = fnameIndex.computeIfAbsent(fnames[it]!!) { Array(20) { ArrayList<Int>() } }
+                val collection = fnameIndex[fnames[it]!!]
                 addToSortedCollection(getIdBucket(account.id, collection), account.id)
             }
         }
 
         measureTimeAndReturnResult("sname index:") {
             account.sname?.let {
-                val collection = snameIndex.computeIfAbsent(snames[it]!!) { Array(20) { ArrayList<Int>() } }
+                val collection = snameIndex[snames[it]!!]
                 addToSortedCollection(getIdBucket(account.id, collection), account.id)
             }
         }
@@ -98,14 +94,14 @@ class AccountRepositoryImpl : AccountRepository {
 
         measureTimeAndReturnResult("country index:") {
             account.country?.let {
-                val collection = countryIndex.computeIfAbsent(countries[it]!!) { Array(20) { ArrayList<Int>() } }
+                val collection = countryIndex[countries[it]!!]
                 addToSortedCollection(getIdBucket(account.id, collection), account.id)
             }
         }
 
         measureTimeAndReturnResult("city index:") {
             account.city?.let {
-                val collection = cityIndex.computeIfAbsent(cities[it]!!) { Array(20) { ArrayList<Int>() } }
+                val collection = cityIndex[cities[it]!!]
                 addToSortedCollection(getIdBucket(account.id, collection), account.id)
             }
         }
@@ -122,7 +118,7 @@ class AccountRepositoryImpl : AccountRepository {
 
         measureTimeAndReturnResult("interest index:") {
             (account.interests ?: emptyList()).forEach {
-                val collection = interestIndex.computeIfAbsent(interests[it]!!) { Array(20) { ArrayList<Int>() } }
+                val collection = interestIndex[interests[it]!!]
                 addToSortedCollection(getIdBucket(account.id, collection), account.id)
             }
         }
@@ -168,7 +164,7 @@ class AccountRepositoryImpl : AccountRepository {
             if (domain != null) indexes.add(emailDomainIndex[domain].getPartitionedIterator())
         }
         filterRequest.sex?.let { (eq) ->
-            indexes.add(sexIndex[eq].getPartitionedIterator())
+            indexes.add(sexIndex[sex2Int(eq)].getPartitionedIterator())
         }
         filterRequest.premium?.let { (now, _) ->
             if (now != null) {
@@ -177,7 +173,7 @@ class AccountRepositoryImpl : AccountRepository {
         }
         filterRequest.status?.let { (eq, neq) ->
             if (eq != null) {
-                indexes.add(statusIndex[statuses[eq]].getPartitionedIterator())
+                indexes.add(statusIndex[statuses[eq]!!].getPartitionedIterator())
             }
             if (neq != null) {
                 statuses.keys().asSequence().filter { it != neq }.map { statuses[it]!! }
@@ -299,13 +295,14 @@ class AccountRepositoryImpl : AccountRepository {
             .take(filterRequest.limit)
     }
 
-    private val listWithNull = listOf(null)
+    private val listWithZero = listOf(0)
+    private val listWithMinusOne = listOf(-1)
     override fun group(groupRequest: GroupRequest): Sequence<Group> {
         val indexes = mutableListOf<Iterator<Int>>()
 
         groupRequest.sname?.let { snames[it] }?.let { snameIndex[it] }?.let { indexes.add(it.getPartitionedIterator()) }
         groupRequest.fname?.let { fnames[it] }?.let { fnameIndex[it] }?.let { indexes.add(it.getPartitionedIterator()) }
-        groupRequest.sex?.let { sexIndex[it] }?.let { indexes.add(it.getPartitionedIterator()) }
+        groupRequest.sex?.let { sexIndex[sex2Int(it)] }?.let { indexes.add(it.getPartitionedIterator()) }
 
         groupRequest.country?.let { countries[it]?.let { countryIndex[it] } }
             ?.let { indexes.add(it.getPartitionedIterator()) }
@@ -338,45 +335,68 @@ class AccountRepositoryImpl : AccountRepository {
         val sequence = if (indexes.isEmpty()) fullIdsSequence() else generateSequenceFromIndexes(indexes)
 
         //sex->status->country->city->interests
-        var entries = 0
-        val map =
-            HashMap<Int?, MutableMap<Int?, MutableMap<Int?, MutableMap<Int?, MutableMap<Int?, AtomicInteger>>>>>()
+        val arrays = Array(if (useSex) 2 else 1) {
+            Array(if (useStatus) 3 else 1) {
+                Array(if (useCountry) countriesIdCounter.get() + 1 else 1) {
+                    Array(if (useCountry) citiesIdCounter.get() + 1 else 1) {
+                        Array(if (useInterest) interestsIdCounter.get() + 2 else 1) {
+                            0
+                        }
+                    }
+                }
+            }
+        }
+        // 0 is null
         sequence
             .mapNotNull { getAccountByIndex(it) }
             .forEach { acc ->
-                val sexMap =
-                    map.computeIfAbsent(if (useSex) acc.sex else null) { HashMap() }
-                val statusMap =
-                    sexMap.computeIfAbsent(if (useStatus) acc.status else null) { HashMap() }
-                val countryMap =
-                    statusMap.computeIfAbsent(if (useCountry) acc.country else null) { HashMap() }
-                val cityMap =
-                    countryMap.computeIfAbsent(if (useCity) acc.city else null) { HashMap() }
+                val sexArray = arrays[if (useSex) acc.sex!! else 0]
+                val statusArray = sexArray[if (useStatus) acc.status!! else 0]
+                val countryArray = statusArray[if (useCountry) acc.country?.let { it + 1 } ?: 0 else 0]
+                val cityMap = countryArray[if (useCity) acc.city?.let { it + 1 } ?: 0 else 0]
+                val interests = if (useInterest) (acc.interests) ?: listWithMinusOne else listWithZero
 
-                val interests = if (useInterest) acc.interests ?: listWithNull else listWithNull
-                interests.forEach { interest ->
-                    cityMap.compute(interest) { _, value ->
-                        if (value == null) {
-                            entries++
-                        }
-                        val v = value ?: AtomicInteger()
-                        v.incrementAndGet()
-                        v
-                    }
+                var i = 0
+                while (i < interests.size) {
+                    cityMap[if (useInterest) interests[i] + 1 else interests[i]]++
+                    i++
                 }
             }
 
-        val tempGroups = ArrayList<Group>(entries)
-        map.entries.forEach { (sex, statusMap) ->
-            statusMap.forEach { (status, countryMap) ->
-                countryMap.forEach { (country, cityMap) ->
-                    cityMap.forEach { city, interests ->
-                        interests.forEach { interest, count ->
-                            tempGroups.add(Group(sex, status, interest, country, city, count.get()))
+        val tempGroups = ArrayList<Group>()
+        var sexIt = 0
+        while (sexIt < arrays.size) {
+            var statusIt = 0
+            val sexBucket = arrays[sexIt]
+            while (statusIt < sexBucket.size) {
+                var countryIt = 0
+                val statusBucket = sexBucket[statusIt]
+                while (countryIt < statusBucket.size) {
+                    var cityIt = 0
+                    val cityBucket = statusBucket[countryIt]
+                    while (cityIt < cityBucket.size) {
+                        var interestIt = 0
+                        val interestBucket = cityBucket[cityIt]
+                        while (interestIt < interestBucket.size) {
+                            tempGroups.add(
+                                Group(
+                                    if (useSex) sexIt else null,
+                                    if (useStatus) statusIt else null,
+                                    if (useCountry) if (countryIt == 0) null else countryIt - 1 else null,
+                                    if (useCity) if (cityIt == 0) null else cityIt - 1 else null,
+                                    if (useInterest) if (interestIt == 0) null else interestIt - 1 else null,
+                                    interestBucket[interestIt]
+                                )
+                            )
+                            interestIt++
                         }
+                        cityIt++
                     }
+                    countryIt++
                 }
+                statusIt++
             }
+            sexIt++
         }
 
         val result = ArrayList<Group>(groupRequest.limit)
@@ -468,11 +488,11 @@ class AccountRepositoryImpl : AccountRepository {
     override fun recommend(id: Int?, city: String?, country: String?, limit: Int): Sequence<InnerAccount> {
         val id = getAccountByIndex(id!!) ?: throw RuntimeException("User $id not found")
 
-        val otherSex = sexIndex[if (id.sex == 0) 'm' else 'f']!!
+        val otherSex = sexIndex[if (id.sex == 0) 1 else 0]
         val premiumIndex = premiumNowIndex
 
-        val countryIndex = countries[country]?.let { countryIndex[it]!! }
-        val cityIndex = cities[city]?.let { cityIndex[it]!! }
+        val countryIndex = countries[country]?.let { countryIndex[it] }
+        val cityIndex = cities[city]?.let { cityIndex[it] }
 
 
 

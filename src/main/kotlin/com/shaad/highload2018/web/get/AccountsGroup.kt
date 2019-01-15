@@ -32,6 +32,7 @@ class AccountsGroup @Inject constructor(private val accountRepository: AccountRe
         BytesUtil.match(buf.bytes(), pathRange.start, path, true)
 
     override fun process(buf: Buf, pathRange: BufRange, paramsRange: BufRange, bodyRange: BufRange): HandlerAnswer {
+
         val params = parseParams(buf, paramsRange)
 
         val request = try {

@@ -12,28 +12,28 @@ val accounts750_1000 = Array<InnerAccount?>(250_000) { null }
 val accounts1000_1300 = Array<InnerAccount?>(300_000) { null }
 val accounts1300 = ConcurrentHashMap<Int, InnerAccount>(100_000)
 
-val statusIndex = ConcurrentHashMap<Int, Array<ArrayList<Int>>>()
+val statusIndex = Array(4) { Array(20) { ArrayList<Int>() } }
 
-val sexIndex = ConcurrentHashMap<Char, Array<ArrayList<Int>>>()
+val sexIndex = Array(2) { Array(20) { ArrayList<Int>() } }
 
-val fnameIndex = ConcurrentHashMap<Int, Array<ArrayList<Int>>>()
+val fnameIndex = Array(1000) { Array(20) { ArrayList<Int>() } }
 
-val snameIndex = ConcurrentHashMap<Int, Array<ArrayList<Int>>>()
+val snameIndex = Array(20000) { Array(20) { ArrayList<Int>() } }
 
 val emailDomainIndex = ConcurrentHashMap<String, Array<ArrayList<Int>>>()
 val emailIndex = Array(36) { ConcurrentHashMap<String, Int>() }
 
 val phoneCodeIndex = Array(1000) { Array(20) { ArrayList<Int>() } }
 
-val countryIndex = ConcurrentHashMap<Int, Array<ArrayList<Int>>>()
+val countryIndex = Array(100) { Array(20) { ArrayList<Int>() } }
 
-val cityIndex = ConcurrentHashMap<Int, Array<ArrayList<Int>>>()
+val cityIndex = Array(1000) { Array(20) { ArrayList<Int>() } }
 
 val birthIndex = Array(100) { Array(20) { ArrayList<Int>() } }
 
 val joinedIndex = Array(10) { Array(20) { ArrayList<Int>() } }
 
-val interestIndex = ConcurrentHashMap<Int, Array<ArrayList<Int>>>()
+val interestIndex = Array(200) { Array(20) { ArrayList<Int>() } }
 
 val premiumNowIndex = Array(20) { ArrayList<Int>() }
 
@@ -45,17 +45,27 @@ val likeIndex1000_1300 = Array<ArrayList<Int>>(300_000) { ArrayList() }
 val likeIndex1300 = ConcurrentHashMap<Int, ArrayList<Int>>(100_000)
 
 //normalization entities
-val idCounter = AtomicInteger()
+val citiesIdCounter = AtomicInteger()
 val cities = ConcurrentHashMap<String, Int>()
 val citiesInv = ConcurrentHashMap<Int, String>()
+
+val countriesIdCounter = AtomicInteger()
 val countries = ConcurrentHashMap<String, Int>()
 val countriesInv = ConcurrentHashMap<Int, String>()
+
+val interestsIdCounter = AtomicInteger()
 val interests = ConcurrentHashMap<String, Int>()
 val interestsInv = ConcurrentHashMap<Int, String>()
+
+val statusesIdCounter = AtomicInteger()
 val statuses = ConcurrentHashMap<String, Int>()
 val statusesInv = ConcurrentHashMap<Int, String>()
+
+val fnamesIdCounter = AtomicInteger()
 val fnames = ConcurrentHashMap<String, Int>()
 val fnamesInv = ConcurrentHashMap<Int, String>()
+
+val snamesIdCounter = AtomicInteger()
 val snames = ConcurrentHashMap<String, Int>()
 val snamesInv = ConcurrentHashMap<Int, String>()
 
@@ -153,10 +163,11 @@ fun addEmailToIndex(email: String, id: Int) {
 fun writeNormalizationIndex(
     index: ConcurrentHashMap<String, Int>,
     invIndex: ConcurrentHashMap<Int, String>,
+    counter: AtomicInteger,
     property: String
 ): Int {
     return index.computeIfAbsent(property) {
-        val id = idCounter.incrementAndGet()
+        val id = counter.incrementAndGet()
         invIndex[id] = property
         id
     }
@@ -167,3 +178,5 @@ fun int2Sex(int: Int?) = when (int) {
     1 -> 'f'
     else -> null
 }
+
+fun sex2Int(sex: Char) = if (sex == 'm') 0 else 1

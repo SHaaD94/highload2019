@@ -180,7 +180,7 @@ fun Array<ArrayList<Int>>?.getPartitionedIterator(): Iterator<Int> {
     return object : Iterator<Int> {
         private val lists = this@getPartitionedIterator.filter { !it.isEmpty() }
         private var currIterator: Iterator<Int>? = null
-        private var curr = 0
+        private var curr = lists.size - 1
 
         init {
             if (!lists.isEmpty()) {
@@ -188,14 +188,14 @@ fun Array<ArrayList<Int>>?.getPartitionedIterator(): Iterator<Int> {
             }
         }
 
-        override fun hasNext() = (currIterator?.hasNext() ?: false) || curr < lists.size - 1
+        override fun hasNext() = (currIterator?.hasNext() ?: false) || curr >  1
 
         override fun next(): Int {
             check(currIterator != null)
             return if (currIterator!!.hasNext()) {
                 currIterator!!.next()
             } else {
-                curr++
+                curr--
                 currIterator = lists[curr].iterator()
                 currIterator!!.next()
             }
