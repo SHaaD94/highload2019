@@ -377,16 +377,18 @@ class AccountRepositoryImpl : AccountRepository {
                         var interestIt = 0
                         val interestBucket = cityBucket[cityIt]
                         while (interestIt < interestBucket.size) {
-                            tempGroups.add(
-                                Group(
-                                    if (useSex) sexIt else null,
-                                    if (statusIt != 0) statusIt else null,
-                                    if (interestIt != 0) interestIt else null,
-                                    if (countryIt != 0) countryIt else null,
-                                    if (cityIt != 0) cityIt else null,
-                                    interestBucket[interestIt]
+                            if (interestBucket[interestIt] != 0) {
+                                tempGroups.add(
+                                    Group(
+                                        if (useSex) sexIt else null,
+                                        if (statusIt != 0) statusIt else null,
+                                        if (interestIt != 0) interestIt else null,
+                                        if (countryIt != 0) countryIt else null,
+                                        if (cityIt != 0) cityIt else null,
+                                        interestBucket[interestIt]
+                                    )
                                 )
-                            )
+                            }
                             interestIt++
                         }
                         cityIt++
@@ -417,7 +419,7 @@ class AccountRepositoryImpl : AccountRepository {
                 }
 
                 if (resGroup !== c) {
-                    val countComparison = resGroup.count!! - c.count!!
+                    val countComparison = resGroup.count - c.count
                     if (countComparison < 0 && groupRequest.order < 0) {
                         resGroup = c
                     } else if (countComparison > 0 && groupRequest.order > 0) {
@@ -484,6 +486,9 @@ class AccountRepositoryImpl : AccountRepository {
         } else true
 
 
+    private val free = "свободны"
+    private val complicated = "все сложно"
+    private val occupied = "заняты"
     override fun recommend(id: Int?, city: String?, country: String?, limit: Int): Sequence<InnerAccount> {
         val id = getAccountByIndex(id!!) ?: throw RuntimeException("User $id not found")
 
@@ -493,6 +498,9 @@ class AccountRepositoryImpl : AccountRepository {
         val countryIndex = countries[country]?.let { countryIndex[it] }
         val cityIndex = cities[city]?.let { cityIndex[it] }
 
+        if (countryIndex == null || cityIndex == null) {
+            return emptySequence()
+        }
 
 
 

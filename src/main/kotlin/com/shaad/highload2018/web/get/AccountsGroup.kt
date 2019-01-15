@@ -131,5 +131,5 @@ data class Group(
     val interest: Int?,
     val country: Int?,
     val city: Int?,
-    val count: Int?
+    val count: Int
 )
