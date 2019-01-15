@@ -296,7 +296,6 @@ class AccountRepositoryImpl : AccountRepository {
     }
 
     private val listWithZero = listOf(0)
-    private val listWithMinusOne = listOf(-1)
     override fun group(groupRequest: GroupRequest): Sequence<Group> {
         val indexes = mutableListOf<Iterator<Int>>()
 
@@ -336,10 +335,10 @@ class AccountRepositoryImpl : AccountRepository {
 
         //sex->status->country->city->interests
         val arrays = Array(if (useSex) 2 else 1) {
-            Array(if (useStatus) 3 else 1) {
+            Array(if (useStatus) 4 else 1) {
                 Array(if (useCountry) countriesIdCounter.get() + 1 else 1) {
-                    Array(if (useCountry) citiesIdCounter.get() + 1 else 1) {
-                        Array(if (useInterest) interestsIdCounter.get() + 2 else 1) {
+                    Array(if (useCity) citiesIdCounter.get() + 1 else 1) {
+                        Array(if (useInterest) interestsIdCounter.get() + 1 else 1) {
                             0
                         }
                     }
@@ -352,13 +351,13 @@ class AccountRepositoryImpl : AccountRepository {
             .forEach { acc ->
                 val sexArray = arrays[if (useSex) acc.sex!! else 0]
                 val statusArray = sexArray[if (useStatus) acc.status!! else 0]
-                val countryArray = statusArray[if (useCountry) acc.country?.let { it + 1 } ?: 0 else 0]
-                val cityMap = countryArray[if (useCity) acc.city?.let { it + 1 } ?: 0 else 0]
-                val interests = if (useInterest) (acc.interests) ?: listWithMinusOne else listWithZero
+                val countryArray = statusArray[if (useCountry) acc.country ?: 0 else 0]
+                val cityMap = countryArray[if (useCity) acc.city ?: 0 else 0]
+                val interests = if (useInterest) (acc.interests) ?: listWithZero else listWithZero
 
                 var i = 0
                 while (i < interests.size) {
-                    cityMap[if (useInterest) interests[i] + 1 else interests[i]]++
+                    cityMap[interests[i]]++
                     i++
                 }
             }
@@ -381,10 +380,10 @@ class AccountRepositoryImpl : AccountRepository {
                             tempGroups.add(
                                 Group(
                                     if (useSex) sexIt else null,
-                                    if (useStatus) statusIt else null,
-                                    if (useCountry) if (countryIt == 0) null else countryIt - 1 else null,
-                                    if (useCity) if (cityIt == 0) null else cityIt - 1 else null,
-                                    if (useInterest) if (interestIt == 0) null else interestIt - 1 else null,
+                                    if (statusIt != 0) statusIt else null,
+                                    if (interestIt != 0) interestIt else null,
+                                    if (countryIt != 0) countryIt else null,
+                                    if (cityIt != 0) cityIt else null,
                                     interestBucket[interestIt]
                                 )
                             )
