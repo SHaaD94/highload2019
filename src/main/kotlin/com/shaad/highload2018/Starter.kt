@@ -35,7 +35,7 @@ fun main(args: Array<String>) {
 
     System.gc()
 
-//    Heater().warmUp()
+    Heater().warmUp()
 
     System.gc()
 }
