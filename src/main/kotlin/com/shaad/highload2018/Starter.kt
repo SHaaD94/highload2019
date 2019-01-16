@@ -3,8 +3,10 @@ package com.shaad.highload2018
 import com.google.inject.Guice
 import com.google.inject.Stage
 import com.shaad.highload2018.configuration.BaseModule
-import com.shaad.highload2018.repository.*
-import com.shaad.highload2018.utils.getPartitionedIterator
+import com.shaad.highload2018.repository.citiesIdCounter
+import com.shaad.highload2018.repository.countriesIdCounter
+import com.shaad.highload2018.repository.fnamesIdCounter
+import com.shaad.highload2018.repository.snamesIdCounter
 import com.shaad.highload2018.utils.measureTimeAndReturnResult
 import com.shaad.highload2018.web.Server
 

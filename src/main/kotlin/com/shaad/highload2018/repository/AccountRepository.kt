@@ -170,7 +170,7 @@ class AccountRepositoryImpl : AccountRepository {
 
     private val lexComparator = UnsignedBytes.lexicographicalComparator()
     override fun filter(filterRequest: FilterRequest): Sequence<InnerAccount> {
-        val indexes = mutableListOf<Iterator<Int>>()
+        val indexes = mutableListOf<IntIterator>()
         filterRequest.email?.let { (domain, _, _) ->
             if (domain != null) indexes.add(emailDomainIndex[domain].getPartitionedIterator())
         }
@@ -231,27 +231,10 @@ class AccountRepositoryImpl : AccountRepository {
                 val gtY = checkBirthYear(gt?.let { getYear(gt) - 1920 } ?: 0)
 
 
-                val iterators: MutableList<Iterator<Int>> = (gtY + 1 until ltY).asSequence()
+                val iterators = (gtY..ltY).asSequence()
                     .map { birthIndex[it] }
                     .map { it.getPartitionedIterator() }
                     .toMutableList()
-
-                val ltIterator = birthIndex[ltY].getPartitionedIterator()
-                if (lt == null) ltIterator else {
-                    ltIterator.asSequence().filter {
-                        val acc = getAccountByIndex(it)!!
-                        acc.birth <= lt
-                    }.iterator()
-                }.let { iterators.add(it) }
-
-
-                val gtIterator = birthIndex[gtY].getPartitionedIterator()
-                if (gt == null) gtIterator else {
-                    gtIterator.asSequence().filter {
-                        val acc = getAccountByIndex(it)!!
-                        acc.birth >= gt
-                    }.iterator()
-                }.let { iterators.add(it) }
 
                 //todo improvements
                 indexes.add(joinIterators(iterators))
@@ -273,7 +256,7 @@ class AccountRepositoryImpl : AccountRepository {
 
         filterRequest.likes?.let { (contains) ->
             contains?.let { likes ->
-                likes.asSequence().map { getLikesByIndex(it)?.iterator() ?: emptyIterator() }
+                likes.asSequence().map { getLikesByIndex(it)?.intIterator() ?: emptyIntIterator() }
                     .forEach { indexes.add(it) }
             }
         }

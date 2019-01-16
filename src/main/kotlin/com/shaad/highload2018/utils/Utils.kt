@@ -3,6 +3,7 @@ package com.shaad.highload2018.utils
 import org.agrona.collections.IntArrayList
 import java.time.LocalDateTime
 import java.time.ZoneOffset
+import kotlin.math.absoluteValue
 
 val moscowTimeZone = ZoneOffset.ofHours(3)
 fun parsePhoneCode(phone: String): String {
@@ -67,64 +68,77 @@ object EmptyIntIterator : IntIterator() {
 fun emptyIterator() = EmptyIterator
 fun emptyIntIterator() = EmptyIntIterator
 
-//todo IntIterator
-fun joinIterators(indexes: List<Iterator<Int>>) = iterator {
-    if (indexes.isEmpty()) {
-        return@iterator
-    }
-    val currentVal = IntArray(indexes.size) { IntArrayList.DEFAULT_NULL_VALUE }
-    var i = 0
-    while (i < indexes.size) {
-        if (indexes[i].hasNext()) {
-            currentVal[i] = indexes[i].next()
-        }
-        i++
-    }
-    while (true) {
-        var maxValue: Int = IntArrayList.DEFAULT_NULL_VALUE
-        var j = 0
-        while (j < currentVal.size) {
-            if (currentVal[j] == IntArrayList.DEFAULT_NULL_VALUE) {
-                j++
-                continue
-            }
-            val it = currentVal[j]
-            if (maxValue == IntArrayList.DEFAULT_NULL_VALUE) {
-                maxValue = it
-            }
-            if (maxValue < it) {
-                maxValue = it
-            }
-            j++
-        }
-        if (maxValue == IntArrayList.DEFAULT_NULL_VALUE) {
-            return@iterator
-        }
-        yield(maxValue)
-        i = 0
-        while (i < indexes.size) {
-            if (currentVal[i] == IntArrayList.DEFAULT_NULL_VALUE) {
-                i++
-                continue
-            }
-            val c = currentVal[i]
-            if (c == maxValue) {
-                currentVal[i] = if (!indexes[i].hasNext()) {
-                    IntArrayList.DEFAULT_NULL_VALUE
-                } else {
-                    indexes[i].next()
+fun joinIterators(indexes: List<IntIterator>): IntIterator =
+    if (indexes.isEmpty()) emptyIntIterator() else
+        object : IntIterator() {
+            private val currentVal = IntArray(indexes.size) { IntArrayList.DEFAULT_NULL_VALUE }
+            private var hasNext = true
+            private var next = IntArrayList.DEFAULT_NULL_VALUE
+
+            init {
+                var i = 0
+                while (i < indexes.size) {
+                    if (indexes[i].hasNext()) {
+                        currentVal[i] = indexes[i].next().absoluteValue
+                    }
+                    i++
                 }
+                findNext()
             }
-            i++
+
+            override fun hasNext() = hasNext
+
+            override fun nextInt(): Int {
+                val next = this.next
+                findNext()
+                return next
+            }
+
+            private fun findNext() {
+                var nextNext = IntArrayList.DEFAULT_NULL_VALUE
+                while (nextNext == IntArrayList.DEFAULT_NULL_VALUE) {
+                    var maxValue: Int = IntArrayList.DEFAULT_NULL_VALUE
+                    var j = 0
+                    var maxIndex = -1
+                    while (j < currentVal.size) {
+                        if (currentVal[j] == IntArrayList.DEFAULT_NULL_VALUE) {
+                            j++
+                            continue
+                        }
+                        val it = currentVal[j]
+                        if (maxValue == IntArrayList.DEFAULT_NULL_VALUE) {
+                            maxValue = it
+                            maxIndex = j
+                        }
+                        if (maxValue < it) {
+                            maxValue = it
+                            maxIndex = j
+                        }
+                        j++
+                    }
+                    if (maxValue == IntArrayList.DEFAULT_NULL_VALUE) {
+                        hasNext = false
+                        return
+                    }
+                    nextNext = maxValue
+                    if (currentVal[maxIndex] != IntArrayList.DEFAULT_NULL_VALUE) {
+                        currentVal[maxIndex] = if (!indexes[maxIndex].hasNext()) {
+                            IntArrayList.DEFAULT_NULL_VALUE
+                        } else {
+                            indexes[maxIndex].next()
+                        }
+                    }
+                }
+                next = nextNext
+            }
         }
-    }
-}.iterator()
+
 
 fun getYear(timestamp: Int): Int {
     return LocalDateTime.ofEpochSecond(timestamp.toLong(), 0, moscowTimeZone).year
 }
 
-fun generateSequenceFromIndexes(indexes: List<Iterator<Int>>): IntIterator =
+fun generateSequenceFromIndexes(indexes: List<IntIterator>): IntIterator =
     if (indexes.isEmpty()) emptyIntIterator() else
         object : IntIterator() {
             private val currentVal = IntArray(indexes.size) { IntArrayList.DEFAULT_NULL_VALUE }
@@ -216,12 +230,12 @@ fun Array<IntArrayList>?.getPartitionedIterator(): IntIterator {
 
         override fun nextInt(): Int {
             return if (curNum <= lists[curList].size - 1) {
-                val number = lists[curList][curNum++]
+                val number = lists[curList].getInt(curNum++)
                 hasNext = curNum <= lists[curList].size - 1 || curList > 0
                 number
             } else {
                 curNum = 0
-                val number = lists[--curList][curNum]
+                val number = lists[--curList].getInt(curNum)
                 hasNext = curNum <= lists[curList].size - 1 || curList > 0
                 number
             }
@@ -254,3 +268,13 @@ fun searchClosest(target: Int, nums: MutableList<Int>): Int {
     return i
 }
 
+fun IntArrayList.intIterator() : IntIterator = object :IntIterator(){
+    private var index = 0
+    override fun hasNext() = index < this@intIterator.size
+    override fun nextInt() = try { this@intIterator[index++] } catch (e: ArrayIndexOutOfBoundsException) { index -= 1; throw NoSuchElementException(e.message) }
+}
+fun IntArray.intIterator() : IntIterator = object :IntIterator(){
+    private var index = 0
+    override fun hasNext() = index < this@intIterator.size
+    override fun nextInt() = try { this@intIterator[index++] } catch (e: ArrayIndexOutOfBoundsException) { index -= 1; throw NoSuchElementException(e.message) }
+}

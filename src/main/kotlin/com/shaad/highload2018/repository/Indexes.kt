@@ -4,6 +4,7 @@ import com.shaad.highload2018.domain.InnerAccount
 import org.agrona.collections.IntArrayList
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.absoluteValue
 
 // indexes
 val accounts0_250 = Array<InnerAccount?>(250_000) { null }
@@ -170,7 +171,7 @@ fun writeNormalizationIndex(
     return index.computeIfAbsent(property) {
         val id = counter.incrementAndGet()
         invIndex[id] = property
-        id
+        id.absoluteValue
     }
 }
 
