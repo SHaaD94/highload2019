@@ -1,6 +1,7 @@
 package com.shaad.highload2018.repository
 
 import com.shaad.highload2018.domain.InnerAccount
+import org.agrona.collections.IntArrayList
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -12,37 +13,37 @@ val accounts750_1000 = Array<InnerAccount?>(250_000) { null }
 val accounts1000_1300 = Array<InnerAccount?>(300_000) { null }
 val accounts1300 = ConcurrentHashMap<Int, InnerAccount>(30_000)
 
-val statusIndex = Array(4) { Array(20) { ArrayList<Int>() } }
+val statusIndex = Array(4) { Array(20) { IntArrayList() } }
 
-val sexIndex = Array(2) { Array(20) { ArrayList<Int>() } }
+val sexIndex = Array(2) { Array(20) { IntArrayList() } }
 
-val fnameIndex = Array(1000) { Array(20) { ArrayList<Int>() } }
+val fnameIndex = Array(1000) { Array(20) { IntArrayList() } }
 
-val snameIndex = Array(20000) { Array(20) { ArrayList<Int>() } }
+val snameIndex = Array(20000) { Array(20) { IntArrayList() } }
 
-val emailDomainIndex = ConcurrentHashMap<String, Array<ArrayList<Int>>>()
+val emailDomainIndex = ConcurrentHashMap<String, Array<IntArrayList>>()
 val emailIndex = Array(36) { ConcurrentHashMap<String, Int>() }
 
-val phoneCodeIndex = Array(1000) { Array(20) { ArrayList<Int>() } }
+val phoneCodeIndex = Array(1000) { Array(20) { IntArrayList() } }
 
-val countryIndex = Array(100) { Array(20) { ArrayList<Int>() } }
+val countryIndex = Array(100) { Array(20) { IntArrayList() } }
 
-val cityIndex = Array(1000) { Array(20) { ArrayList<Int>() } }
+val cityIndex = Array(1000) { Array(20) { IntArrayList() } }
 
-val birthIndex = Array(100) { Array(20) { ArrayList<Int>() } }
+val birthIndex = Array(100) { Array(20) { IntArrayList() } }
 
-val joinedIndex = Array(10) { Array(20) { ArrayList<Int>() } }
+val joinedIndex = Array(10) { Array(20) { IntArrayList() } }
 
-val interestIndex = Array(200) { Array(20) { ArrayList<Int>() } }
+val interestIndex = Array(200) { Array(20) { IntArrayList() } }
 
-val premiumNowIndex = Array(20) { ArrayList<Int>() }
+val premiumNowIndex = Array(20) { IntArrayList() }
 
-val likeIndex0_250 = Array<ArrayList<Int>>(250_000) { ArrayList() }
-val likeIndex250_500 = Array<ArrayList<Int>>(250_000) { ArrayList() }
-val likeIndex500_750 = Array<ArrayList<Int>>(250_000) { ArrayList() }
-val likeIndex750_1000 = Array<ArrayList<Int>>(250_000) { ArrayList() }
-val likeIndex1000_1300 = Array<ArrayList<Int>>(300_000) { ArrayList() }
-val likeIndex1300 = ConcurrentHashMap<Int, ArrayList<Int>>(30_000)
+val likeIndex0_250 = Array<IntArrayList>(250_000) { IntArrayList() }
+val likeIndex250_500 = Array<IntArrayList>(250_000) { IntArrayList() }
+val likeIndex500_750 = Array<IntArrayList>(250_000) { IntArrayList() }
+val likeIndex750_1000 = Array<IntArrayList>(250_000) { IntArrayList() }
+val likeIndex1000_1300 = Array<IntArrayList>(300_000) { IntArrayList() }
+val likeIndex1300 = ConcurrentHashMap<Int, IntArrayList>(30_000)
 
 //normalization entities
 val citiesIdCounter = AtomicInteger()
@@ -70,7 +71,7 @@ val snames = ConcurrentHashMap<String, Int>()
 val snamesInv = ConcurrentHashMap<Int, String>()
 
 
-fun getIdBucket(id: Int, array: Array<ArrayList<Int>>): ArrayList<Int> = when {
+fun getIdBucket(id: Int, array: Array<IntArrayList>): IntArrayList = when {
     id < 100_000 -> 0
     id in 100_000 until 200_000 -> 1
     id in 200_000 until 300_000 -> 2
@@ -133,7 +134,7 @@ fun getLexIndex(char: Char) = when (char) {
     else -> throw RuntimeException("Unknown char $char")
 }
 
-fun getLikesByIndex(likeId: Int): ArrayList<Int>? =
+fun getLikesByIndex(likeId: Int): IntArrayList? =
     when {
         likeId < 250_000 -> likeIndex0_250[likeId]
         likeId in 250_000 until 500_000 -> likeIndex250_500[likeId - 250_000]
@@ -173,10 +174,10 @@ fun writeNormalizationIndex(
     }
 }
 
-fun int2Sex(int: Int?) = when (int) {
+fun int2Sex(int: Int) = when (int) {
     0 -> 'm'
     1 -> 'f'
-    else -> null
+    else -> throw RuntimeException("Unknown sex $int")
 }
 
 fun sex2Int(sex: Char) = if (sex == 'm') 0 else 1

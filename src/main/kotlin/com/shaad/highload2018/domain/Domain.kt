@@ -1,7 +1,9 @@
 package com.shaad.highload2018.domain
 
+import org.agrona.collections.IntArrayList
+
 data class Account(
-    val id: Int?,
+    val id: Int,
     // max 100 symbols, unique
     val email: String,
     // max 50 symbols
@@ -41,25 +43,20 @@ data class Premium(val start: Int, val finish: Int) {
     }
 }
 
-data class Like(val id: Int?, val ts: Int)
+data class Like(val id: Int, val ts: Int)
 
 class InnerAccount(
-    val id: Int?,
-    val status: Int?,
+    val id: Int,
+    val status: Int,
     val email: ByteArray,
-    val sex: Int?,
+    val sex: Int,
     val fname: Int?,
     val sname: Int?,
     val city: Int?,
     val country: Int?,
     val birth: Int,
     val phone: ByteArray?,
-    val premiumStart: Int?,
-    val premiumFinish: Int?,
-    val interests: List<Int>?/*,
+    val premium : Premium?,
+    val interests: IntArrayList?/*,
     val likes: List<InnerLike>?*/
 )
-
-data class InnerLike(val id: Int?, val days: Int?, val ms: Int?) {
-    constructor(like: Like) : this(like.id, like.ts / 86400, like.ts % 86400)
-}

@@ -122,12 +122,12 @@ class AccountsFilter @Inject constructor(private val repository: AccountReposito
                     bytes.append(acc.birth.toString().toByteArray())
                 }
                 if (filterRequest.premium != null) {
-                    if (acc.premiumStart != null) {
+                    if (acc.premium != null) {
                         bytes.append(comma)
                         bytes.append(premiumStart)
-                        bytes.append(acc.premiumStart.toString().toByteArray())
+                        bytes.append(acc.premium.start.toString().toByteArray())
                         bytes.append(premiumFinish)
-                        bytes.append(acc.premiumFinish.toString().toByteArray())
+                        bytes.append(acc.premium.finish.toString().toByteArray())
                         bytes.append(figuredBracketClose)
                     }
                 }

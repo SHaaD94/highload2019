@@ -1,8 +1,8 @@
 package com.shaad.highload2018.utils
 
+import org.agrona.collections.IntArrayList
 import java.time.LocalDateTime
 import java.time.ZoneOffset
-import java.util.*
 
 val moscowTimeZone = ZoneOffset.ofHours(3)
 fun parsePhoneCode(phone: String): String {
@@ -52,19 +52,27 @@ fun <T> measureTimeAndReturnResultLazy(opName: () -> String = { "" }, block: () 
 
 object EmptyIterator : Iterator<Nothing> {
     override fun hasNext() = false
-
     override fun next(): Nothing {
         TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
     }
 }
 
-fun emptyIterator() = EmptyIterator
+object EmptyIntIterator : IntIterator() {
+    override fun hasNext() = false
+    override fun nextInt(): Int {
+        TODO("not implemented")
+    }
+}
 
-fun joinIterators(indexes: List<Iterator<Int>>) = iterator<Int> {
+fun emptyIterator() = EmptyIterator
+fun emptyIntIterator() = EmptyIntIterator
+
+//todo IntIterator
+fun joinIterators(indexes: List<Iterator<Int>>) = iterator {
     if (indexes.isEmpty()) {
         return@iterator
     }
-    val currentVal = Array<Int?>(indexes.size) { null }
+    val currentVal = IntArray(indexes.size) { IntArrayList.DEFAULT_NULL_VALUE }
     var i = 0
     while (i < indexes.size) {
         if (indexes[i].hasNext()) {
@@ -73,36 +81,36 @@ fun joinIterators(indexes: List<Iterator<Int>>) = iterator<Int> {
         i++
     }
     while (true) {
-        var maxValue: Int? = null
+        var maxValue: Int = IntArrayList.DEFAULT_NULL_VALUE
         var j = 0
         while (j < currentVal.size) {
-            if (currentVal[j] == null) {
+            if (currentVal[j] == IntArrayList.DEFAULT_NULL_VALUE) {
                 j++
                 continue
             }
             val it = currentVal[j]
-            if (maxValue == null) {
+            if (maxValue == IntArrayList.DEFAULT_NULL_VALUE) {
                 maxValue = it
             }
-            if (maxValue!! < it!!) {
+            if (maxValue < it) {
                 maxValue = it
             }
             j++
         }
-        if (maxValue == null) {
+        if (maxValue == IntArrayList.DEFAULT_NULL_VALUE) {
             return@iterator
         }
         yield(maxValue)
         i = 0
         while (i < indexes.size) {
-            if (currentVal[i] == null) {
+            if (currentVal[i] == IntArrayList.DEFAULT_NULL_VALUE) {
                 i++
                 continue
             }
             val c = currentVal[i]
             if (c == maxValue) {
                 currentVal[i] = if (!indexes[i].hasNext()) {
-                    null
+                    IntArrayList.DEFAULT_NULL_VALUE
                 } else {
                     indexes[i].next()
                 }
@@ -110,47 +118,20 @@ fun joinIterators(indexes: List<Iterator<Int>>) = iterator<Int> {
             i++
         }
     }
-}
+}.iterator()
 
 fun getYear(timestamp: Int): Int {
     return LocalDateTime.ofEpochSecond(timestamp.toLong(), 0, moscowTimeZone).year
 }
 
-fun generateSequenceFromIndexes(indexes: List<Iterator<Int>>): Sequence<Int> = sequence {
-    if (indexes.isEmpty()) {
-        return@sequence
-    }
-    var i = 0
-    val currentVal = Array<Int?>(indexes.size) { null }
-    while (i < indexes.size) {
-        if (!indexes[i].hasNext()) {
-            return@sequence
-        }
-        currentVal[i] = indexes[i].next()
-        i++
-    }
-
-    while (true) {
-        var allEqual = true
-        var id2Yield = -1
-        i = 0
-        while (i < indexes.size) {
-            val c = currentVal[i]!!
-            if (id2Yield == -1) {
-                id2Yield = c
-            } else {
-                if (id2Yield != c) {
-                    allEqual = false
-                }
-                if (id2Yield > c) {
-                    id2Yield = c
-                }
+fun generateSequenceFromIndexes(indexes: List<Iterator<Int>>): Sequence<Int> =
+    if (indexes.isEmpty()) emptySequence() else
+        sequence {
+            if (indexes.isEmpty()) {
+                return@sequence
             }
-            i++
-        }
-        if (allEqual) {
-            yield(id2Yield)
-            i = 0
+            var i = 0
+            val currentVal = IntArray(indexes.size) { IntArrayList.DEFAULT_NULL_VALUE }
             while (i < indexes.size) {
                 if (!indexes[i].hasNext()) {
                     return@sequence
@@ -158,26 +139,55 @@ fun generateSequenceFromIndexes(indexes: List<Iterator<Int>>): Sequence<Int> = s
                 currentVal[i] = indexes[i].next()
                 i++
             }
-        } else {
-            i = 0
-            while (i < indexes.size) {
-                if (currentVal[i]!! >= id2Yield) {
-                    while (currentVal[i]!! > id2Yield) {
+
+            while (true) {
+                var allEqual = true
+                var id2Yield = -1
+                i = 0
+                while (i < indexes.size) {
+                    val c = currentVal[i]
+                    if (id2Yield == -1) {
+                        id2Yield = c
+                    } else {
+                        if (id2Yield != c) {
+                            allEqual = false
+                        }
+                        if (id2Yield > c) {
+                            id2Yield = c
+                        }
+                    }
+                    i++
+                }
+                if (allEqual) {
+                    yield(id2Yield)
+                    i = 0
+                    while (i < indexes.size) {
                         if (!indexes[i].hasNext()) {
                             return@sequence
                         }
                         currentVal[i] = indexes[i].next()
+                        i++
+                    }
+                } else {
+                    i = 0
+                    while (i < indexes.size) {
+                        if (currentVal[i] >= id2Yield) {
+                            while (currentVal[i] > id2Yield) {
+                                if (!indexes[i].hasNext()) {
+                                    return@sequence
+                                }
+                                currentVal[i] = indexes[i].next()
+                            }
+                        }
+                        i++
                     }
                 }
-                i++
             }
         }
-    }
-}
 
-fun Array<ArrayList<Int>>?.getPartitionedIterator(): Iterator<Int> {
-    this ?: return emptyIterator()
-    return object : Iterator<Int> {
+fun Array<IntArrayList>?.getPartitionedIterator(): IntIterator {
+    this ?: return emptyIntIterator()
+    return object : IntIterator() {
         private val lists = this@getPartitionedIterator.filter { !it.isEmpty() }
         private var curNum = 0
         private var hasNext = !lists.isEmpty()
@@ -185,7 +195,7 @@ fun Array<ArrayList<Int>>?.getPartitionedIterator(): Iterator<Int> {
 
         override fun hasNext() = hasNext
 
-        override fun next(): Int {
+        override fun nextInt(): Int {
             return if (curNum <= lists[curList].size - 1) {
                 val number = lists[curList][curNum++]
                 hasNext = curNum <= lists[curList].size - 1 || curList > 0
@@ -200,15 +210,15 @@ fun Array<ArrayList<Int>>?.getPartitionedIterator(): Iterator<Int> {
     }
 }
 
-fun addToSortedCollection(list: ArrayList<Int>, id: Int?) {
+fun addToSortedCollection(list: IntArrayList, id: Int) {
     synchronized(list) {
-        val closest = searchClosest(id!!, list)
+        val closest = searchClosest(id, list)
 
-        list.add(closest, id)
+        list.addInt(closest, id)
     }
 }
 
-fun searchClosest(target: Int, nums: ArrayList<Int>): Int {
+fun searchClosest(target: Int, nums: MutableList<Int>): Int {
     var i = 0
     var j = nums.size - 1
 

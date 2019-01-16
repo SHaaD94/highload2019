@@ -7,12 +7,13 @@ import com.shaad.highload2018.utils.*
 import com.shaad.highload2018.web.get.FilterRequest
 import com.shaad.highload2018.web.get.Group
 import com.shaad.highload2018.web.get.GroupRequest
+import org.agrona.collections.IntArrayList
 
 interface AccountRepository {
     fun addAccount(account: Account)
     fun filter(filterRequest: FilterRequest): Sequence<InnerAccount>
     fun group(groupRequest: GroupRequest): Sequence<Group>
-    fun recommend(id: Int?, city: String?, country: String?, limit: Int): Sequence<InnerAccount>
+    fun recommend(id: Int, city: String?, country: String?, limit: Int): Sequence<InnerAccount>
 }
 
 class AccountRepositoryImpl : AccountRepository {
@@ -20,7 +21,7 @@ class AccountRepositoryImpl : AccountRepository {
     private var maxId = 0
 
     override fun addAccount(account: Account) {
-        check(getAccountByIndex(account.id!!) == null) { "User ${account.id} already exists" }
+        check(getAccountByIndex(account.id) == null) { "User ${account.id} already exists" }
 
         measureTimeAndReturnResult("id index") {
             val innerAccount = InnerAccount(
@@ -34,9 +35,19 @@ class AccountRepositoryImpl : AccountRepository {
                 account.country?.let { writeNormalizationIndex(countries, countriesInv, countriesIdCounter, it) },
                 account.birth,
                 account.phone?.toByteArray(),
-                account.premium?.start,
-                account.premium?.finish,
-                account.interests?.map { writeNormalizationIndex(interests, interestsInv, interestsIdCounter, it) }
+                account.premium,
+                account.interests?.map {
+                    writeNormalizationIndex(
+                        interests,
+                        interestsInv,
+                        interestsIdCounter,
+                        it
+                    )
+                }?.let { intArrayList ->
+                    val intArray = IntArrayList()
+                    intArrayList.forEach { intArray.addInt(it) }
+                    intArray
+                }
                 //account.likes?.map {  InnerLike(it) }
             )
             when {
@@ -76,7 +87,7 @@ class AccountRepositoryImpl : AccountRepository {
         account.email.let { email ->
             measureTimeAndReturnResult("email domain index:") {
                 val domain = email.split("@").let { parsedEmail -> parsedEmail[parsedEmail.size - 1] }
-                val collection = emailDomainIndex.computeIfAbsent(domain) { Array(20) { ArrayList<Int>() } }
+                val collection = emailDomainIndex.computeIfAbsent(domain) { Array(20) { IntArrayList() } }
                 addToSortedCollection(getIdBucket(account.id, collection), account.id)
             }
             measureTimeAndReturnResult("email index:") {
@@ -131,7 +142,7 @@ class AccountRepositoryImpl : AccountRepository {
 
         measureTimeAndReturnResult("like index:") {
             (account.likes ?: emptyList()).forEach { (likeIdInt, _) ->
-                val likeId = likeIdInt!!
+                val likeId = likeIdInt
                 var collection = when {
                     likeId < 250_000 -> likeIndex0_250[likeId]
                     likeId in 250_000 until 500_000 -> likeIndex250_500[likeId - 250_000]
@@ -141,7 +152,7 @@ class AccountRepositoryImpl : AccountRepository {
                     else -> null
                 }
                 if (collection == null) {
-                    collection = likeIndex1300.computeIfAbsent(likeId) { ArrayList(30) }
+                    collection = likeIndex1300.computeIfAbsent(likeId) { IntArrayList() }
                 }
 
                 addToSortedCollection(collection, account.id)
@@ -177,7 +188,7 @@ class AccountRepositoryImpl : AccountRepository {
             }
             if (neq != null) {
                 statuses.keys().asSequence().filter { it != neq }.map { statuses[it]!! }
-                    .map { statusIndex[it]!!.getPartitionedIterator() }
+                    .map { statusIndex[it].getPartitionedIterator() }
                     .toList()
                     .let { indexes.add(joinIterators(it)) }
             }
@@ -220,7 +231,7 @@ class AccountRepositoryImpl : AccountRepository {
                 val gtY = checkBirthYear(gt?.let { getYear(gt) - 1920 } ?: 0)
 
 
-                val iterators = (gtY + 1 until ltY).asSequence()
+                val iterators: MutableList<Iterator<Int>> = (gtY + 1 until ltY).asSequence()
                     .map { birthIndex[it] }
                     .map { it.getPartitionedIterator() }
                     .toMutableList()
@@ -290,14 +301,14 @@ class AccountRepositoryImpl : AccountRepository {
                         filterByNull(filterRequest.phone?.nill, id.phone) &&
                         filterByNull(filterRequest.country?.nill, id.country) &&
                         filterByNull(filterRequest.city?.nill, id.city) &&
-                        filterByNull(filterRequest.premium?.nill, id.premiumStart)
+                        filterByNull(filterRequest.premium?.nill, id.premium)
             }
             .take(filterRequest.limit)
     }
 
     private val listWithZero = listOf(0)
     override fun group(groupRequest: GroupRequest): Sequence<Group> {
-        val indexes = mutableListOf<Iterator<Int>>()
+        val indexes = mutableListOf<IntIterator>()
 
         groupRequest.sname?.let { snames[it] }?.let { snameIndex[it] }?.let { indexes.add(it.getPartitionedIterator()) }
         groupRequest.fname?.let { fnames[it] }?.let { fnameIndex[it] }?.let { indexes.add(it.getPartitionedIterator()) }
@@ -323,7 +334,8 @@ class AccountRepositoryImpl : AccountRepository {
             }
             joinedIndex[mappedYear]
         }?.let { indexes.add(it.getPartitionedIterator()) }
-        groupRequest.likes?.let { getLikesByIndex(it) ?: emptyList<Int>() }?.let { indexes.add(it.iterator()) }
+        groupRequest.likes?.let { getLikesByIndex(it) ?: emptyList<Int>() }
+            ?.let { indexes.add(it.toIntArray().iterator()) }
 
         val useSex = groupRequest.keys.contains("sex")
         val useStatus = groupRequest.keys.contains("status")
@@ -338,7 +350,7 @@ class AccountRepositoryImpl : AccountRepository {
             Array(if (useStatus) 4 else 1) {
                 Array(if (useCountry) countriesIdCounter.get() + 1 else 1) {
                     Array(if (useCity) citiesIdCounter.get() + 1 else 1) {
-                        Array(if (useInterest) interestsIdCounter.get() + 1 else 1) {
+                        IntArray(if (useInterest) interestsIdCounter.get() + 1 else 1) {
                             0
                         }
                     }
@@ -349,8 +361,8 @@ class AccountRepositoryImpl : AccountRepository {
         sequence
             .mapNotNull { getAccountByIndex(it) }
             .forEach { acc ->
-                val sexArray = arrays[if (useSex) acc.sex!! else 0]
-                val statusArray = sexArray[if (useStatus) acc.status!! else 0]
+                val sexArray = arrays[if (useSex) acc.sex else 0]
+                val statusArray = sexArray[if (useStatus) acc.status else 0]
                 val countryArray = statusArray[if (useCountry) acc.country ?: 0 else 0]
                 val cityMap = countryArray[if (useCity) acc.city ?: 0 else 0]
                 val interests = if (useInterest) (acc.interests) ?: listWithZero else listWithZero
@@ -482,9 +494,9 @@ class AccountRepositoryImpl : AccountRepository {
 //        return result.asSequence()
     }
 
-    private fun getGroupComparingString(groupRequest: GroupRequest, pos: Int?, g: Group): String? =
-        when (groupRequest.keys.getOrNull(pos!!)) {
-            "sex" -> int2Sex(g.sex).toString()
+    private fun getGroupComparingString(groupRequest: GroupRequest, pos: Int, g: Group): String? =
+        when (groupRequest.keys.getOrNull(pos)) {
+            "sex" -> g.sex?.let { int2Sex(it) }.toString()
             "status" -> g.status?.let { statusesInv[it] }
             "interests" -> g.interest?.let { interestsInv[it] }
             "country" -> g.country?.let { countriesInv[it] }
@@ -510,8 +522,8 @@ class AccountRepositoryImpl : AccountRepository {
     private val free = "свободны"
     private val complicated = "все сложно"
     private val occupied = "заняты"
-    override fun recommend(id: Int?, city: String?, country: String?, limit: Int): Sequence<InnerAccount> {
-        val id = getAccountByIndex(id!!) ?: throw RuntimeException("User $id not found")
+    override fun recommend(id: Int, city: String?, country: String?, limit: Int): Sequence<InnerAccount> {
+        val id = getAccountByIndex(id) ?: throw RuntimeException("User $id not found")
 
         val otherSex = sexIndex[if (id.sex == 0) 1 else 0]
         val premiumIndex = premiumNowIndex
