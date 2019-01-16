@@ -124,64 +124,83 @@ fun getYear(timestamp: Int): Int {
     return LocalDateTime.ofEpochSecond(timestamp.toLong(), 0, moscowTimeZone).year
 }
 
-fun generateSequenceFromIndexes(indexes: List<Iterator<Int>>): Sequence<Int> =
-    if (indexes.isEmpty()) emptySequence() else
-        sequence {
-            if (indexes.isEmpty()) {
-                return@sequence
-            }
-            var i = 0
-            val currentVal = IntArray(indexes.size) { IntArrayList.DEFAULT_NULL_VALUE }
-            while (i < indexes.size) {
-                if (!indexes[i].hasNext()) {
-                    return@sequence
-                }
-                currentVal[i] = indexes[i].next()
-                i++
-            }
+fun generateSequenceFromIndexes(indexes: List<Iterator<Int>>): IntIterator =
+    if (indexes.isEmpty()) emptyIntIterator() else
+        object : IntIterator() {
+            private val currentVal = IntArray(indexes.size) { IntArrayList.DEFAULT_NULL_VALUE }
+            private var hasNext = true
+            private var next = IntArrayList.DEFAULT_NULL_VALUE
 
-            while (true) {
-                var allEqual = true
-                var id2Yield = -1
-                i = 0
+            init {
+                var i = 0
                 while (i < indexes.size) {
-                    val c = currentVal[i]
-                    if (id2Yield == -1) {
-                        id2Yield = c
+                    if (!indexes[i].hasNext()) {
+                        hasNext = false
+                        break
                     } else {
-                        if (id2Yield != c) {
-                            allEqual = false
-                        }
-                        if (id2Yield > c) {
-                            id2Yield = c
-                        }
-                    }
-                    i++
-                }
-                if (allEqual) {
-                    yield(id2Yield)
-                    i = 0
-                    while (i < indexes.size) {
-                        if (!indexes[i].hasNext()) {
-                            return@sequence
-                        }
                         currentVal[i] = indexes[i].next()
                         i++
                     }
-                } else {
-                    i = 0
+                }
+                findNext()
+            }
+
+            override fun hasNext() = hasNext
+
+            override fun nextInt(): Int {
+                val next = this.next
+                findNext()
+                return next
+            }
+
+            private fun findNext() {
+                var newNext = IntArrayList.DEFAULT_NULL_VALUE
+                while (newNext == IntArrayList.DEFAULT_NULL_VALUE) {
+                    var allEqual = true
+                    var id2Yield = -1
+                    var i = 0
                     while (i < indexes.size) {
-                        if (currentVal[i] >= id2Yield) {
-                            while (currentVal[i] > id2Yield) {
-                                if (!indexes[i].hasNext()) {
-                                    return@sequence
-                                }
-                                currentVal[i] = indexes[i].next()
+                        val c = currentVal[i]
+                        if (id2Yield == -1) {
+                            id2Yield = c
+                        } else {
+                            if (id2Yield != c) {
+                                allEqual = false
+                            }
+                            if (id2Yield > c) {
+                                id2Yield = c
                             }
                         }
                         i++
                     }
+                    if (allEqual) {
+                        newNext = id2Yield
+                        i = 0
+                        while (i < indexes.size) {
+                            if (!indexes[i].hasNext()) {
+                                hasNext = false
+                                return
+                            }
+                            currentVal[i] = indexes[i].next()
+                            i++
+                        }
+                    } else {
+                        i = 0
+                        while (i < indexes.size) {
+                            if (currentVal[i] >= id2Yield) {
+                                while (currentVal[i] > id2Yield) {
+                                    if (!indexes[i].hasNext()) {
+                                        hasNext = false
+                                        return
+                                    }
+                                    currentVal[i] = indexes[i].next()
+                                }
+                            }
+                            i++
+                        }
+                    }
                 }
+                next = newNext
             }
         }
 

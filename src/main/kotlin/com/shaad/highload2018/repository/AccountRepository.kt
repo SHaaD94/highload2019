@@ -278,7 +278,7 @@ class AccountRepositoryImpl : AccountRepository {
             }
         }
 
-        val sequence = if (indexes.isEmpty()) fullIdsSequence() else generateSequenceFromIndexes(indexes)
+        val sequence = if (indexes.isEmpty()) fullIdsSequence() else generateSequenceFromIndexes(indexes).asSequence()
 
         return sequence
             .mapNotNull { getAccountByIndex(it) }
@@ -343,7 +343,7 @@ class AccountRepositoryImpl : AccountRepository {
         val useCountry = groupRequest.keys.contains("country")
         val useCity = groupRequest.keys.contains("city")
 
-        val sequence = if (indexes.isEmpty()) fullIdsSequence() else generateSequenceFromIndexes(indexes)
+        val sequence = if (indexes.isEmpty()) fullIdsSequence() else generateSequenceFromIndexes(indexes).asSequence()
 
         //sex->status->country->city->interests
         val arrays = Array(if (useSex) 2 else 1) {
