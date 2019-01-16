@@ -37,6 +37,8 @@ dependencies {
 
     compile("com.wizzardo.tools", "tools", "0.19")
 
+    compile("org.agrona", "agrona", "0.9.29")
+
     compile("com.fasterxml.jackson.core", "jackson-core", "2.9.8")
     compile("com.fasterxml.jackson.module", "jackson-module-kotlin", "2.9.8")
 

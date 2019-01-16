@@ -179,25 +179,22 @@ fun Array<ArrayList<Int>>?.getPartitionedIterator(): Iterator<Int> {
     this ?: return emptyIterator()
     return object : Iterator<Int> {
         private val lists = this@getPartitionedIterator.filter { !it.isEmpty() }
-        private var currIterator: Iterator<Int>? = null
-        private var curr = lists.size - 1
+        private var hasNext = !lists.isEmpty()
+        private var curNum = 0
+        private var curList = lists.size - 1
 
-        init {
-            if (!lists.isEmpty()) {
-                currIterator = lists[curr].iterator()
-            }
-        }
-
-        override fun hasNext() = (currIterator?.hasNext() ?: false) || curr >  1
+        override fun hasNext() = hasNext
 
         override fun next(): Int {
-            check(currIterator != null)
-            return if (currIterator!!.hasNext()) {
-                currIterator!!.next()
+            return if (curNum < lists[curList].size - 1) {
+                curNum++
+                hasNext = curNum < lists[curList].size - 1 || curList > 0
+                lists[curList][curNum]
             } else {
-                curr--
-                currIterator = lists[curr].iterator()
-                currIterator!!.next()
+                curList--
+                curNum = 0
+                hasNext = curNum < lists[curList].size - 1 || curList > 0
+                lists[curList][curNum]
             }
         }
     }

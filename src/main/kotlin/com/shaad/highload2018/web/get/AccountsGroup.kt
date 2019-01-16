@@ -9,6 +9,8 @@ import org.rapidoid.buffer.Buf
 import org.rapidoid.bytes.BytesUtil
 import org.rapidoid.data.BufRange
 import org.rapidoid.http.HttpVerb
+import java.util.*
+import java.util.stream.IntStream
 
 class AccountsGroup @Inject constructor(private val accountRepository: AccountRepository) : HandlerBase() {
     private val path = "/accounts/group/".toByteArray()
@@ -32,7 +34,6 @@ class AccountsGroup @Inject constructor(private val accountRepository: AccountRe
         BytesUtil.match(buf.bytes(), pathRange.start, path, true)
 
     override fun process(buf: Buf, pathRange: BufRange, paramsRange: BufRange, bodyRange: BufRange): HandlerAnswer {
-
         val params = parseParams(buf, paramsRange)
 
         val request = try {

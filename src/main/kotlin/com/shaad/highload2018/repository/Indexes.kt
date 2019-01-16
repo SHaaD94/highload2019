@@ -10,7 +10,7 @@ val accounts250_500 = Array<InnerAccount?>(250_000) { null }
 val accounts500_750 = Array<InnerAccount?>(250_000) { null }
 val accounts750_1000 = Array<InnerAccount?>(250_000) { null }
 val accounts1000_1300 = Array<InnerAccount?>(300_000) { null }
-val accounts1300 = ConcurrentHashMap<Int, InnerAccount>(100_000)
+val accounts1300 = ConcurrentHashMap<Int, InnerAccount>(30_000)
 
 val statusIndex = Array(4) { Array(20) { ArrayList<Int>() } }
 
@@ -42,7 +42,7 @@ val likeIndex250_500 = Array<ArrayList<Int>>(250_000) { ArrayList() }
 val likeIndex500_750 = Array<ArrayList<Int>>(250_000) { ArrayList() }
 val likeIndex750_1000 = Array<ArrayList<Int>>(250_000) { ArrayList() }
 val likeIndex1000_1300 = Array<ArrayList<Int>>(300_000) { ArrayList() }
-val likeIndex1300 = ConcurrentHashMap<Int, ArrayList<Int>>(100_000)
+val likeIndex1300 = ConcurrentHashMap<Int, ArrayList<Int>>(30_000)
 
 //normalization entities
 val citiesIdCounter = AtomicInteger()

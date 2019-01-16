@@ -49,5 +49,6 @@ class DataFiller @Inject constructor(private val accountRepository: AccountRepos
                 }
             }
         }.joinAll()
+
     }
 }

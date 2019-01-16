@@ -38,8 +38,8 @@ CMD ["java", \
      "-XX:NewSize=500m",\
 #     "-XX:-UseAdaptiveSizePolicy",\
 \
-     "-Xmx1500m",\
-     "-Xms1500m",\
+     "-Xmx1700m",\
+     "-Xms1700m",\
      "-Xss228k",\
 \
      "-jar", "app.jar"]

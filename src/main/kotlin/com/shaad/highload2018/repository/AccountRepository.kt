@@ -400,65 +400,86 @@ class AccountRepositoryImpl : AccountRepository {
             sexIt++
         }
 
-        val result = ArrayList<Group>(groupRequest.limit)
-        var i = 0
-        while (i < groupRequest.limit && i < tempGroups.size) {
-            var resGroup: Group? = null
-            var j = 0
-            elemLoop@ while (j < tempGroups.size) {
-                val c = tempGroups[j]
-                if (result.contains(c)) {
-                    j++
-                    continue
-                }
+        val comparator = compareBy<Group>({ it.count },
+            { getGroupComparingString(groupRequest, 0, it) },
+            { getGroupComparingString(groupRequest, 1, it) },
+            { getGroupComparingString(groupRequest, 2, it) },
+            { getGroupComparingString(groupRequest, 3, it) },
+            { getGroupComparingString(groupRequest, 4, it) })
 
-                if (resGroup == null) {
-                    resGroup = c
-                    j++
-                    continue
-                }
-
-                if (resGroup !== c) {
-                    val countComparison = resGroup.count - c.count
-                    if (countComparison < 0 && groupRequest.order < 0) {
-                        resGroup = c
-                    } else if (countComparison > 0 && groupRequest.order > 0) {
-                        resGroup = c
-                    } else if (countComparison == 0) {
-                        var propertyCounter = 0
-                        propertyLoop@ while (propertyCounter < 5) {
-                            val resString = getGroupComparingString(groupRequest, countComparison, resGroup!!)
-                            val cString = getGroupComparingString(groupRequest, countComparison, c)
-                            if (resString == null && cString != null) {
-                                break@propertyLoop
-                            }
-                            if (cString == null && resString != null) {
-                                resGroup = c
-                                break@propertyLoop
-                            }
-                            if (cString == resString) {
-                                propertyCounter++
-                                continue@propertyLoop
-                            }
-                            if (cString!! > resString!! && groupRequest.order < 0) {
-                                resGroup = c
-                                break@propertyLoop
-                            }
-                            if (cString < resString && groupRequest.order > 0) {
-                                resGroup = c
-                                break@propertyLoop
-                            }
-                            break@propertyLoop
-                        }
-                    }
-                }
-                j++
-            }
-            result.add(resGroup!!)
-            i++
+        var iterations = groupRequest.limit
+        val result = LinkedHashSet<Group>()
+        while (iterations != 0) {
+            val element =
+                tempGroups
+                    .asSequence()
+                    .filter { e -> !result.contains(e) }
+                    .let { groups ->
+                        if (groupRequest.order == 1) groups.minWith(comparator) else groups.maxWith(comparator)
+                    } ?: break
+            result.add(element)
+            iterations--
         }
-
         return result.asSequence()
+//        val result = LinkedHashSet<Group>()
+//        var i = 0
+//        while (i < groupRequest.limit && i < tempGroups.size) {
+//            var resGroup: Group? = null
+//            var j = 0
+//            elemLoop@ while (j < tempGroups.size) {
+//                val c = tempGroups[j]
+//                if (result.contains(c)) {
+//                    j++
+//                    continue
+//                }
+//
+//                if (resGroup == null) {
+//                    resGroup = c
+//                    j++
+//                    continue
+//                }
+//
+//                if (resGroup !== c) {
+//                    val countComparison = resGroup.count - c.count
+//                    if (countComparison < 0 && groupRequest.order < 0) {
+//                        resGroup = c
+//                    } else if (countComparison > 0 && groupRequest.order > 0) {
+//                        resGroup = c
+//                    } else if (countComparison == 0) {
+//                        var propertyCounter = 0
+//                        propertyLoop@ while (propertyCounter < 5) {
+//                            val resString = getGroupComparingString(groupRequest, countComparison, resGroup!!)
+//                            val cString = getGroupComparingString(groupRequest, countComparison, c)
+//                            if (resString == null && cString != null) {
+//                                break@propertyLoop
+//                            }
+//                            if (cString == null && resString != null) {
+//                                resGroup = c
+//                                break@propertyLoop
+//                            }
+//                            if (cString == resString) {
+//                                propertyCounter++
+//                                continue@propertyLoop
+//                            }
+//                            if (cString!! > resString!! && groupRequest.order < 0) {
+//                                resGroup = c
+//                                break@propertyLoop
+//                            }
+//                            if (cString < resString && groupRequest.order > 0) {
+//                                resGroup = c
+//                                break@propertyLoop
+//                            }
+//                            break@propertyLoop
+//                        }
+//                    }
+//                }
+//                j++
+//            }
+//            result.add(resGroup!!)
+//            i++
+//        }
+//
+//        return result.asSequence()
     }
 
     private fun getGroupComparingString(groupRequest: GroupRequest, pos: Int?, g: Group): String? =
