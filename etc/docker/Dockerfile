@@ -8,32 +8,38 @@ CMD ["java", \
 \
      "-XX:+UseG1GC",\
 \
-     "-XX:+PrintGCDetails",\
-     "-XX:+ShowMessageBoxOnError",\
-     "-XX:+PrintGCApplicationStoppedTime",\
-     "-XX:+PrintGCTimeStamps",\
+#     "-XX:+PrintGCDetails",\
+#     "-XX:+ShowMessageBoxOnError",\
+#     "-XX:+PrintGCApplicationStoppedTime",\
+#     "-XX:+PrintGCTimeStamps",\
+     "-XX:+UnlockDiagnosticVMOptions",\
+     "-XX:NativeMemoryTracking=summary",\
+     "-XX:+PrintNMTStatistics",\
 \
-     "-Djava.lang.Integer.IntegerCache.high=1700000",\
+#     "-Djava.lang.Integer.IntegerCache.high=1400000",\
 \
-     "-XX:ParallelGCThreads=4",\
+     "-XX:ParallelGCThreads=2",\
 #     "-XX:InitiatingHeapOccupancyPercent=40", \
      "-XX:MaxGCPauseMillis=500",\
-     "-XX:G1ReservePercent=5",\
+     "-XX:G1ReservePercent=1",\
 \
 #     "-XX:+OptimizeStringConcat",\
 #     "-XX:+EliminateLocks",\
      "-XX:+UseCompressedOops",\
-     "-XX:CompileThreshold=10",\
+     "-XX:+AggressiveOpts",\
+     "-XX:AutoBoxCacheMax=1400000",\
+#     "-XX:CompileThreshold=10",\
 \
 \
      "-XX:MaxMetaspaceSize=64m",\
 #     "-XX:SurvivorRatio=6",\
 \
-     "-XX:MaxNewSize=400m",\
-     "-XX:NewSize=400m",\
+     "-XX:MaxNewSize=500m",\
+     "-XX:NewSize=500m",\
 #     "-XX:-UseAdaptiveSizePolicy",\
 \
-     "-Xmx1700m",\
-     "-Xms1700m",\
+     "-Xmx1500m",\
+     "-Xms1500m",\
+     "-Xss228k",\
 \
      "-jar", "app.jar"]
