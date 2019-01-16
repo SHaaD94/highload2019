@@ -261,32 +261,57 @@ class AccountRepositoryImpl : AccountRepository {
             }
         }
 
-        val sequence = if (indexes.isEmpty()) fullIdsSequence() else generateSequenceFromIndexes(indexes).asSequence()
+        val iterator = if (indexes.isEmpty()) fullIdsIterator() else generateIteratorFromIndexes(indexes)
 
-        return sequence
-            .mapNotNull { getAccountByIndex(it) }
-            .filter { acc ->
-                if (filterRequest.email != null) {
-                    val ltFilter = if (filterRequest.email.lt != null) {
-                        lexComparator.compare(acc.email, filterRequest.email.lt) <= 0
-                    } else true
+        val result = ArrayList<InnerAccount>(filterRequest.limit)
+        while (iterator.hasNext() && result.size != filterRequest.limit) {
+            val acc = getAccountByIndex(iterator.nextInt()) ?: continue
 
-                    val gtFilter = if (filterRequest.email.gt != null) {
-                        lexComparator.compare(acc.email, filterRequest.email.gt) >= 0
-                        true
-                    } else true
-                    ltFilter && gtFilter
+            val isFilteredByEmail = if (filterRequest.email != null) {
+                val ltFilter = if (filterRequest.email.lt != null) {
+                    lexComparator.compare(acc.email, filterRequest.email.lt) <= 0
                 } else true
+
+                val gtFilter = if (filterRequest.email.gt != null) {
+                    lexComparator.compare(acc.email, filterRequest.email.gt) >= 0
+                    true
+                } else true
+                ltFilter && gtFilter
+            } else true
+
+            if (!isFilteredByEmail) {
+                continue
             }
-            .filter { id ->
-                filterByNull(filterRequest.fname?.nill, id.fname) &&
-                        filterByNull(filterRequest.sname?.nill, id.sname) &&
-                        filterByNull(filterRequest.phone?.nill, id.phone) &&
-                        filterByNull(filterRequest.country?.nill, id.country) &&
-                        filterByNull(filterRequest.city?.nill, id.city) &&
-                        filterByNull(filterRequest.premium?.nill, id.premium)
+
+            val isFilteredByNull = filterByNull(filterRequest.fname?.nill, acc.fname) &&
+                    filterByNull(filterRequest.sname?.nill, acc.sname) &&
+                    filterByNull(filterRequest.phone?.nill, acc.phone) &&
+                    filterByNull(filterRequest.country?.nill, acc.country) &&
+                    filterByNull(filterRequest.city?.nill, acc.city) &&
+                    filterByNull(filterRequest.premium?.nill, acc.premium)
+
+            if (!isFilteredByNull) {
+                continue
             }
-            .take(filterRequest.limit)
+
+            val isFilteredByAge = if (filterRequest.birth != null) {
+                val ltFilter = if (filterRequest.birth.lt != null) {
+                    acc.birth <= filterRequest.birth.lt
+                } else true
+
+                val gtFilter = if (filterRequest.birth.gt != null) {
+                    acc.birth >= filterRequest.birth.gt
+                    true
+                } else true
+                ltFilter && gtFilter
+            } else true
+
+            if (!isFilteredByAge) {
+                continue
+            }
+            result.add(acc)
+        }
+        return result.asSequence()
     }
 
     private val listWithZero = listOf(0)
@@ -326,7 +351,7 @@ class AccountRepositoryImpl : AccountRepository {
         val useCountry = groupRequest.keys.contains("country")
         val useCity = groupRequest.keys.contains("city")
 
-        val sequence = if (indexes.isEmpty()) fullIdsSequence() else generateSequenceFromIndexes(indexes).asSequence()
+        val iterator = if (indexes.isEmpty()) fullIdsIterator() else generateIteratorFromIndexes(indexes)
 
         //sex->status->country->city->interests
         val arrays = Array(if (useSex) 2 else 1) {
@@ -341,21 +366,21 @@ class AccountRepositoryImpl : AccountRepository {
             }
         }
         // 0 is null
-        sequence
-            .mapNotNull { getAccountByIndex(it) }
-            .forEach { acc ->
-                val sexArray = arrays[if (useSex) acc.sex else 0]
-                val statusArray = sexArray[if (useStatus) acc.status else 0]
-                val countryArray = statusArray[if (useCountry) acc.country ?: 0 else 0]
-                val cityMap = countryArray[if (useCity) acc.city ?: 0 else 0]
-                val interests = if (useInterest) (acc.interests) ?: listWithZero else listWithZero
+        while (iterator.hasNext()) {
+            val acc = getAccountByIndex(iterator.nextInt()) ?: continue
 
-                var i = 0
-                while (i < interests.size) {
-                    cityMap[interests[i]]++
-                    i++
-                }
+            val sexArray = arrays[if (useSex) acc.sex else 0]
+            val statusArray = sexArray[if (useStatus) acc.status else 0]
+            val countryArray = statusArray[if (useCountry) acc.country ?: 0 else 0]
+            val cityMap = countryArray[if (useCity) acc.city ?: 0 else 0]
+            val interests = if (useInterest) (acc.interests) ?: listWithZero else listWithZero
+
+            var i = 0
+            while (i < interests.size) {
+                cityMap[interests[i]]++
+                i++
             }
+        }
 
         val tempGroups = ArrayList<Group>()
         var sexIt = 0
@@ -524,5 +549,9 @@ class AccountRepositoryImpl : AccountRepository {
         return emptySequence()
     }
 
-    private fun fullIdsSequence() = (maxId downTo 0).asSequence()
+    private fun fullIdsIterator() = object : IntIterator() {
+        private var cur = maxId
+        override fun nextInt() = cur--
+        override fun hasNext() = cur > 0
+    }
 }
