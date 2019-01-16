@@ -180,18 +180,21 @@ fun Array<ArrayList<Int>>?.getPartitionedIterator(): Iterator<Int> {
     return object : Iterator<Int> {
         private val lists = this@getPartitionedIterator.filter { !it.isEmpty() }
         private var curNum = 0
+        private var hasNext = !lists.isEmpty()
         private var curList = lists.size - 1
 
-        override fun hasNext() = curNum < lists[curList].size - 1 || curList > 0
+        override fun hasNext() = hasNext
 
         override fun next(): Int {
-            return if (curNum < lists[curList].size - 1) {
-                curNum++
-                lists[curList][curNum]
+            return if (curNum <= lists[curList].size - 1) {
+                val number = lists[curList][curNum++]
+                hasNext = curNum <= lists[curList].size - 1 || curList > 0
+                number
             } else {
-                curList--
                 curNum = 0
-                lists[curList][curNum]
+                val number = lists[--curList][curNum]
+                hasNext = curNum <= lists[curList].size - 1 || curList > 0
+                number
             }
         }
     }
