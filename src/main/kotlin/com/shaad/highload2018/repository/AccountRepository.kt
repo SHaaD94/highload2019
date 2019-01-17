@@ -230,13 +230,11 @@ class AccountRepositoryImpl : AccountRepository {
                 val ltY = checkBirthYear(lt?.let { getYear(lt) - 1920 } ?: 99)
                 val gtY = checkBirthYear(gt?.let { getYear(gt) - 1920 } ?: 0)
 
-
                 val iterators = (gtY..ltY).asSequence()
                     .map { birthIndex[it] }
                     .map { it.getPartitionedIterator() }
                     .toMutableList()
 
-                //todo improvements
                 indexes.add(joinIterators(iterators))
             }
 
@@ -274,7 +272,6 @@ class AccountRepositoryImpl : AccountRepository {
 
                 val gtFilter = if (filterRequest.email.gt != null) {
                     lexComparator.compare(acc.email, filterRequest.email.gt) >= 0
-                    true
                 } else true
                 ltFilter && gtFilter
             } else true
@@ -301,7 +298,6 @@ class AccountRepositoryImpl : AccountRepository {
 
                 val gtFilter = if (filterRequest.birth.gt != null) {
                     acc.birth >= filterRequest.birth.gt
-                    true
                 } else true
                 ltFilter && gtFilter
             } else true

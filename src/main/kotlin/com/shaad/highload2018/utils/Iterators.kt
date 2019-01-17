@@ -63,9 +63,11 @@ fun generateIteratorFromIndexes(indexes: List<IntIterator>): IntIterator =
                             minValue = currentVal[i]
                             continue
                         }
-                        if (minValue < currentVal[i]) {
+                        if (minValue != currentVal[i]) {
                             allEqual = false
-                            minValue = currentVal[i]
+                            if (minValue > currentVal[i]) {
+                                minValue = currentVal[i]
+                            }
                         }
                     }
                     if (allEqual) {
@@ -77,7 +79,7 @@ fun generateIteratorFromIndexes(indexes: List<IntIterator>): IntIterator =
                         }
                     } else {
                         for (i in 0 until currentVal.size) {
-                            while (currentVal[i] >= minValue) {
+                            while (currentVal[i] > minValue) {
                                 currentVal[i] =
                                         if (!indexes[i].hasNext()) IntArrayList.DEFAULT_NULL_VALUE
                                         else indexes[i].nextInt()
