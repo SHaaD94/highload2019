@@ -24,7 +24,7 @@ class Server @Inject constructor(
             .blockingAccept(false)
             .noDelay(true)
             .syncBufs(false)
-            .workers(4)
+            .workers(16)
             .address(address)
             .port(port)
             .build()
