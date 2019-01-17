@@ -62,7 +62,7 @@ fun addToSortedCollection(list: IntArrayList, id: Int) {
     }
 }
 
-fun searchClosest(target: Int, nums: MutableList<Int>): Int {
+fun searchClosest(target: Int, nums: IntArrayList): Int {
     var i = 0
     var j = nums.size - 1
 
@@ -70,8 +70,8 @@ fun searchClosest(target: Int, nums: MutableList<Int>): Int {
         val mid = (i + j) / 2
 
         when {
-            target < nums[mid] -> i = mid + 1
-            target > nums[mid] -> j = mid - 1
+            target < nums.getInt(mid) -> i = mid + 1
+            target > nums.getInt(mid) -> j = mid - 1
             else -> return mid
         }
     }

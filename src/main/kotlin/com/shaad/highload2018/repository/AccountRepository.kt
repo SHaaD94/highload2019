@@ -3,11 +3,13 @@ package com.shaad.highload2018.repository
 import com.google.common.primitives.UnsignedBytes
 import com.shaad.highload2018.domain.Account
 import com.shaad.highload2018.domain.InnerAccount
+import com.shaad.highload2018.domain.Like
 import com.shaad.highload2018.utils.*
 import com.shaad.highload2018.web.get.FilterRequest
 import com.shaad.highload2018.web.get.Group
 import com.shaad.highload2018.web.get.GroupRequest
 import org.agrona.collections.IntArrayList
+import java.lang.Math.abs
 
 interface AccountRepository {
     fun addAccount(account: Account)
@@ -47,8 +49,15 @@ class AccountRepositoryImpl : AccountRepository {
                     val intArray = IntArrayList()
                     intArrayList.forEach { intArray.addInt(it) }
                     intArray
+                },
+                account.likes?.let {
+                    val intArray = IntArrayList()
+                    for (i in 0 until it.size){
+                        intArray.addInt(it[i].id)
+                        intArray.addInt(it[i].ts)
+                    }
+                    intArray
                 }
-                //account.likes?.map {  InnerLike(it) }
             )
             when {
                 account.id < 250_000 -> accounts0_250[account.id] = innerAccount
@@ -90,9 +99,9 @@ class AccountRepositoryImpl : AccountRepository {
                 val collection = emailDomainIndex.computeIfAbsent(domain) { Array(20) { IntArrayList() } }
                 addToSortedCollection(getIdBucket(account.id, collection), account.id)
             }
-            measureTimeAndReturnResult("email index:") {
-                addEmailToIndex(email, account.id)
-            }
+//            measureTimeAndReturnResult("email index:") {
+//                addEmailToIndex(email, account.id)
+//            }
         }
 
         measureTimeAndReturnResult("phone index:") {
@@ -142,17 +151,16 @@ class AccountRepositoryImpl : AccountRepository {
 
         measureTimeAndReturnResult("like index:") {
             (account.likes ?: emptyList()).forEach { (likeIdInt, _) ->
-                val likeId = likeIdInt
                 var collection = when {
-                    likeId < 250_000 -> likeIndex0_250[likeId]
-                    likeId in 250_000 until 500_000 -> likeIndex250_500[likeId - 250_000]
-                    likeId in 500_000 until 750_000 -> likeIndex500_750[likeId - 500_000]
-                    likeId in 750_000 until 1_000_000 -> likeIndex750_1000[likeId - 750_000]
-                    likeId in 1_000_000 until 1_300_000 -> likeIndex1000_1300[likeId - 1_000_000]
+                    likeIdInt < 250_000 -> likeIndex0_250[likeIdInt]
+                    likeIdInt in 250_000 until 500_000 -> likeIndex250_500[likeIdInt - 250_000]
+                    likeIdInt in 500_000 until 750_000 -> likeIndex500_750[likeIdInt - 500_000]
+                    likeIdInt in 750_000 until 1_000_000 -> likeIndex750_1000[likeIdInt - 750_000]
+                    likeIdInt in 1_000_000 until 1_300_000 -> likeIndex1000_1300[likeIdInt - 1_000_000]
                     else -> null
                 }
                 if (collection == null) {
-                    collection = likeIndex1300.computeIfAbsent(likeId) { IntArrayList() }
+                    collection = likeIndex1300.computeIfAbsent(likeIdInt) { IntArrayList() }
                 }
 
                 addToSortedCollection(collection, account.id)
@@ -437,72 +445,13 @@ class AccountRepositoryImpl : AccountRepository {
             iterations--
         }
         return result.asSequence()
-//        val result = LinkedHashSet<Group>()
-//        var i = 0
-//        while (i < groupRequest.limit && i < tempGroups.size) {
-//            var resGroup: Group? = null
-//            var j = 0
-//            elemLoop@ while (j < tempGroups.size) {
-//                val c = tempGroups[j]
-//                if (result.contains(c)) {
-//                    j++
-//                    continue
-//                }
-//
-//                if (resGroup == null) {
-//                    resGroup = c
-//                    j++
-//                    continue
-//                }
-//
-//                if (resGroup !== c) {
-//                    val countComparison = resGroup.count - c.count
-//                    if (countComparison < 0 && groupRequest.order < 0) {
-//                        resGroup = c
-//                    } else if (countComparison > 0 && groupRequest.order > 0) {
-//                        resGroup = c
-//                    } else if (countComparison == 0) {
-//                        var propertyCounter = 0
-//                        propertyLoop@ while (propertyCounter < 5) {
-//                            val resString = getGroupComparingString(groupRequest, countComparison, resGroup!!)
-//                            val cString = getGroupComparingString(groupRequest, countComparison, c)
-//                            if (resString == null && cString != null) {
-//                                break@propertyLoop
-//                            }
-//                            if (cString == null && resString != null) {
-//                                resGroup = c
-//                                break@propertyLoop
-//                            }
-//                            if (cString == resString) {
-//                                propertyCounter++
-//                                continue@propertyLoop
-//                            }
-//                            if (cString!! > resString!! && groupRequest.order < 0) {
-//                                resGroup = c
-//                                break@propertyLoop
-//                            }
-//                            if (cString < resString && groupRequest.order > 0) {
-//                                resGroup = c
-//                                break@propertyLoop
-//                            }
-//                            break@propertyLoop
-//                        }
-//                    }
-//                }
-//                j++
-//            }
-//            result.add(resGroup!!)
-//            i++
-//        }
-//
-//        return result.asSequence()
     }
 
 
     private fun getGroupComparingString(groupRequest: GroupRequest, pos: Int, g: Group): String? =
         when (groupRequest.keys.getOrNull(pos)) {
             "sex" -> g.sex?.let { int2Sex(it) }?.let {
-                when (it){
+                when (it) {
                     'm' -> "m"
                     'f' -> "f"
                     else -> throw RuntimeException("wrong sex $it")
@@ -529,25 +478,131 @@ class AccountRepositoryImpl : AccountRepository {
             }
         } else true
 
-
     private val free = "свободны"
-    private val complicated = "все сложно"
+    private val complicated = "всё сложно"
     private val occupied = "заняты"
     override fun recommend(id: Int, city: String?, country: String?, limit: Int): Sequence<InnerAccount> {
-        val id = getAccountByIndex(id) ?: throw RuntimeException("User $id not found")
+        val account = getAccountByIndex(id) ?: throw RuntimeException("User $id not found")
 
-        val otherSex = sexIndex[if (id.sex == 0) 1 else 0]
-        val premiumIndex = premiumNowIndex
+        val oppositeSex = sexIndex[if (account.sex == 0) 1 else 0]
 
-        val countryIndex = countries[country]?.let { countryIndex[it] }
-        val cityIndex = cities[city]?.let { cityIndex[it] }
+        val countryIndex = country?.let { countries[it] }?.let { countryIndex[it] }
+        val cityIndex = city?.let { cities[it] }?.let { cityIndex[it] }
 
-        if (countryIndex == null || cityIndex == null) {
+        if ((country != null && countryIndex == null)
+            || (city != null && cityIndex == null)
+        ) {
             return emptySequence()
         }
 
+        val interestIndexes = account.interests?.map { interestIndex[it] } ?: return emptySequence()
 
-        return emptySequence()
+        fun searchClosestAccountByAction(
+            target: InnerAccount,
+            accounts: ArrayList<InnerAccount>,
+            action: (InnerAccount) -> Int
+        ): Int {
+            var i = 0
+            var j = accounts.size - 1
+
+            while (i <= j) {
+                val mid = (i + j) / 2
+
+                when {
+                    action(target) < action(accounts[mid]) -> i = mid + 1
+                    action(target) > action(accounts[mid]) -> j = mid - 1
+                    else -> return mid
+                }
+            }
+
+            return i
+        }
+
+        fun getUsersByStatus(status: String, usePremium: Boolean): Iterator<InnerAccount> {
+            val statusIterator = statusIndex[statuses[status]!!].getPartitionedIterator()
+
+            val interestIterator = joinIterators(interestIndexes.map { it.getPartitionedIterator() })
+
+            val iterators = ArrayList<IntIterator>(6)
+            if (countryIndex != null) iterators.add(countryIndex.getPartitionedIterator())
+            if (cityIndex != null) iterators.add(cityIndex.getPartitionedIterator())
+            if (usePremium) iterators.add(premiumNowIndex.getPartitionedIterator())
+            iterators.add(interestIterator)
+            iterators.add(oppositeSex.getPartitionedIterator())
+            iterators.add(statusIterator)
+
+            val resultIterator = generateIteratorFromIndexes(iterators)
+
+            val usersByInterests = Array<ArrayList<InnerAccount>?>(account.interests.size) { null }
+            while (resultIterator.hasNext()) {
+                val foundAcc = getAccountByIndex(resultIterator.nextInt())!!
+                var commonInterests = -1
+                for (i in 0 until foundAcc.interests!!.size) {
+                    if (account.interests.containsInt(foundAcc.interests.getInt(i))) {
+                        commonInterests++
+                    }
+                }
+                var bucket = usersByInterests[commonInterests]
+                if (bucket == null) {
+                    bucket = ArrayList()
+                    usersByInterests[commonInterests] = bucket
+                }
+                bucket.add(searchClosestAccountByAction(foundAcc, bucket) { abs(account.birth - it.birth) }, foundAcc)
+            }
+            return object : Iterator<InnerAccount> {
+                private var hasNext = true
+                private var next: InnerAccount? = null
+                private var curList = usersByInterests.size
+                private var curPos = -1
+
+                init {
+                    findNext()
+                }
+
+                override fun hasNext() = hasNext
+
+                override fun next(): InnerAccount {
+                    val next = this.next
+                    findNext()
+                    return next!!
+                }
+
+                private fun findNext() {
+                    if (curPos == -1) {
+                        curList--
+
+                        while (curList > 0 && usersByInterests[curList] == null) {
+                            curList--
+                            curPos = usersByInterests[curList]?.let { it.size - 1 } ?: -1
+                        }
+                        if (curList < 0 || usersByInterests[curList] == null) {
+                            hasNext = false
+                            return
+                        }
+                        curPos = usersByInterests[curList]!!.size - 1
+                    }
+                    next = usersByInterests[curList]!![curPos]
+                    curPos--
+                }
+            }
+        }
+
+        val result = ArrayList<InnerAccount>(limit)
+        fun readIterator(accounts: Iterator<InnerAccount>): Boolean {
+            while (accounts.hasNext() && result.size < limit) {
+                result.add(accounts.next())
+            }
+            return accounts.hasNext()
+        }
+
+        if (readIterator(getUsersByStatus(free, true))) return result.asSequence()
+        if (readIterator(getUsersByStatus(complicated, true))) return result.asSequence()
+        if (readIterator(getUsersByStatus(occupied, true))) return result.asSequence()
+        if (readIterator(getUsersByStatus(free, false))) return result.asSequence()
+        if (readIterator(getUsersByStatus(complicated, false))) return result.asSequence()
+        if (readIterator(getUsersByStatus(occupied, false))) return result.asSequence()
+
+        return result.asSequence()
     }
 
     private fun fullIdsIterator() = object : IntIterator() {

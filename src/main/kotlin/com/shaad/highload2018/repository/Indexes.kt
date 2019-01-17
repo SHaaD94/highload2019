@@ -18,12 +18,12 @@ val statusIndex = Array(4) { Array(20) { IntArrayList() } }
 
 val sexIndex = Array(2) { Array(20) { IntArrayList() } }
 
-val fnameIndex = Array(1000) { Array(20) { IntArrayList() } }
+val fnameIndex = Array(200) { Array(20) { IntArrayList() } }
 
-val snameIndex = Array(20000) { Array(20) { IntArrayList() } }
+val snameIndex = Array(2000) { Array(20) { IntArrayList() } }
 
 val emailDomainIndex = ConcurrentHashMap<String, Array<IntArrayList>>()
-val emailIndex = Array(36) { ConcurrentHashMap<String, Int>() }
+//val emailIndex = Array(36) { ConcurrentHashMap<String, Int>() }
 
 val phoneCodeIndex = Array(1000) { Array(20) { IntArrayList() } }
 
@@ -155,12 +155,12 @@ fun getAccountByIndex(id: Int): InnerAccount? = when {
     else -> accounts1300[id]
 }
 
-fun addEmailToIndex(email: String, id: Int) {
-    emailIndex[getLexIndex(email[0])].compute(email) { _, existingId ->
-        if (existingId != null) throw RuntimeException("email $email already binded")
-        else id
-    }
-}
+//fun addEmailToIndex(email: String, id: Int) {
+//    emailIndex[getLexIndex(email[0])].compute(email) { _, existingId ->
+//        if (existingId != null) throw RuntimeException("email $email already binded")
+//        else id
+//    }
+//}
 
 fun writeNormalizationIndex(
     index: ConcurrentHashMap<String, Int>,

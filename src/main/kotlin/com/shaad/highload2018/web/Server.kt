@@ -26,7 +26,6 @@ class Server @Inject constructor(
             .syncBufs(false)
             .workers(8)
             .address(address)
-            .maxPipeline(32)
             .port(port)
             .build()
             .start()
