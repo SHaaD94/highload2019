@@ -498,9 +498,16 @@ class AccountRepositoryImpl : AccountRepository {
 //        return result.asSequence()
     }
 
+
     private fun getGroupComparingString(groupRequest: GroupRequest, pos: Int, g: Group): String? =
         when (groupRequest.keys.getOrNull(pos)) {
-            "sex" -> g.sex?.let { int2Sex(it) }.toString()
+            "sex" -> g.sex?.let { int2Sex(it) }?.let {
+                when (it){
+                    'm' -> "m"
+                    'f' -> "f"
+                    else -> throw RuntimeException("wrong sex $it")
+                }
+            }
             "status" -> g.status?.let { statusesInv[it] }
             "interests" -> g.interest?.let { interestsInv[it] }
             "country" -> g.country?.let { countriesInv[it] }
@@ -538,8 +545,6 @@ class AccountRepositoryImpl : AccountRepository {
         if (countryIndex == null || cityIndex == null) {
             return emptySequence()
         }
-
-
 
 
         return emptySequence()

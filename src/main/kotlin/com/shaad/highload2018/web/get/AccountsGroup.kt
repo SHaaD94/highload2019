@@ -67,11 +67,11 @@ class AccountsGroup @Inject constructor(private val accountRepository: AccountRe
             bytes
                 .append(figuredBracketOpen)
                 .append(countBytes)
-                .append(group.count.toString().toByteArray())
+                .append(group.count)
             if (group.sex != null) {
                 bytes.append(comma)
                 bytes.append(sexBytes)
-                bytes.append(int2Sex(group.sex)!!.toString().toByteArray())
+                bytes.append(int2Sex(group.sex))
                 bytes.append(quotes)
             }
             if (group.status != null) {

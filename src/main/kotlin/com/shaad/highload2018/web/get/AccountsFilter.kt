@@ -53,7 +53,7 @@ class AccountsFilter @Inject constructor(private val repository: AccountReposito
                     .append(figuredBracketOpen)
                     //id
                     .append(idBytes)
-                    .append(acc.id!!.toString().toByteArray())
+                    .append(acc.id)
                     .append(comma)
                     //email
                     .append(emailBytes)
@@ -63,7 +63,7 @@ class AccountsFilter @Inject constructor(private val repository: AccountReposito
                 if (filterRequest.sex != null) {
                     bytes.append(comma)
                     bytes.append(sexBytes)
-                    bytes.append(int2Sex(acc.sex)!!.toString().toByteArray())
+                    bytes.append(int2Sex(acc.sex))
                     bytes.append(quotes)
                 }
                 if (filterRequest.status != null) {
@@ -119,15 +119,15 @@ class AccountsFilter @Inject constructor(private val repository: AccountReposito
                 if (filterRequest.birth != null) {
                     bytes.append(comma)
                     bytes.append(birthBytes)
-                    bytes.append(acc.birth.toString().toByteArray())
+                    bytes.append(acc.birth)
                 }
                 if (filterRequest.premium != null) {
                     if (acc.premium != null) {
                         bytes.append(comma)
                         bytes.append(premiumStart)
-                        bytes.append(acc.premium.start.toString().toByteArray())
+                        bytes.append(acc.premium.start)
                         bytes.append(premiumFinish)
-                        bytes.append(acc.premium.finish.toString().toByteArray())
+                        bytes.append(acc.premium.finish)
                         bytes.append(figuredBracketClose)
                     }
                 }
