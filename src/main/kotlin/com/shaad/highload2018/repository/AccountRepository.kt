@@ -342,8 +342,8 @@ class AccountRepositoryImpl : AccountRepository {
             }
             joinedIndex[mappedYear]
         }?.let { indexes.add(it.getPartitionedIterator()) }
-        groupRequest.likes?.let { getLikesByIndex(it) ?: emptyList<Int>() }
-            ?.let { indexes.add(it.toIntArray().iterator()) }
+        groupRequest.likes?.let { getLikesByIndex(it)?.intIterator() ?: emptyIntIterator() }
+            ?.let { indexes.add(it) }
 
         val useSex = groupRequest.keys.contains("sex")
         val useStatus = groupRequest.keys.contains("status")

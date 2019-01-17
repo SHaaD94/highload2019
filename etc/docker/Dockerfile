@@ -16,8 +16,6 @@ CMD ["java", \
      "-XX:NativeMemoryTracking=summary",\
      "-XX:+PrintNMTStatistics",\
 \
-#     "-Djava.lang.Integer.IntegerCache.high=1400000",\
-\
      "-XX:ParallelGCThreads=2",\
 #     "-XX:InitiatingHeapOccupancyPercent=40", \
      "-XX:MaxGCPauseMillis=500",\
@@ -27,7 +25,7 @@ CMD ["java", \
 #     "-XX:+EliminateLocks",\
      "-XX:+UseCompressedOops",\
      "-XX:+AggressiveOpts",\
-     "-XX:AutoBoxCacheMax=1400000",\
+     "-XX:AutoBoxCacheMax=20000",\
 #     "-XX:CompileThreshold=10",\
 \
 \
