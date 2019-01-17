@@ -22,22 +22,26 @@ fun generateIteratorFromIndexes(indexes: List<IntIterator>): IntIterator =
     if (indexes.isEmpty()) emptyIntIterator() else
         object : IntIterator() {
             private val currentVal = IntArray(indexes.size) { IntArrayList.DEFAULT_NULL_VALUE }
+            private var hasNext = true
             private var next = IntArrayList.DEFAULT_NULL_VALUE
 
             init {
-                var i = 0
-                while (i < indexes.size) {
-                    if (indexes[i].hasNext()) {
-                        currentVal[i] = indexes[i].nextInt()
-                        i++
-                    } else {
-                        break
+                for (i in 0 until currentVal.size) {
+                    if (currentVal[i] == IntArrayList.DEFAULT_NULL_VALUE) {
+                        if (indexes[i].hasNext()) {
+                            currentVal[i] = indexes[i].nextInt()
+                        } else {
+                            next = IntArrayList.DEFAULT_NULL_VALUE
+                            hasNext = false
+                        }
                     }
                 }
-                findNext()
+                if (hasNext) {
+                    findNext()
+                }
             }
 
-            override fun hasNext() = next != IntArrayList.DEFAULT_NULL_VALUE
+            override fun hasNext() = hasNext
 
             override fun nextInt(): Int {
                 val next = this.next
@@ -47,53 +51,40 @@ fun generateIteratorFromIndexes(indexes: List<IntIterator>): IntIterator =
 
             private fun findNext() {
                 next = IntArrayList.DEFAULT_NULL_VALUE
-                var newNext = IntArrayList.DEFAULT_NULL_VALUE
-                while (newNext == IntArrayList.DEFAULT_NULL_VALUE) {
+                while (next == IntArrayList.DEFAULT_NULL_VALUE) {
+                    var minValue = Int.MAX_VALUE
                     var allEqual = true
-                    var id2Yield = -1
-                    var i = 0
-                    while (i < indexes.size) {
-                        val c = currentVal[i]
-                        if (id2Yield == -1) {
-                            id2Yield = c
-                        } else {
-                            if (id2Yield != c) {
-                                allEqual = false
-                            }
-                            if (id2Yield > c) {
-                                id2Yield = c
-                            }
+                    for (i in 0 until currentVal.size) {
+                        if (currentVal[i] == IntArrayList.DEFAULT_NULL_VALUE) {
+                            hasNext = false
+                            return
                         }
-                        i++
+                        if (minValue == Int.MAX_VALUE) {
+                            minValue = currentVal[i]
+                            continue
+                        }
+                        if (minValue < currentVal[i]) {
+                            allEqual = false
+                            minValue = currentVal[i]
+                        }
                     }
                     if (allEqual) {
-                        newNext = id2Yield
-                        i = 0
-                        while (i < indexes.size) {
-                            if (!indexes[i].hasNext()) {
-                                next = IntArrayList.DEFAULT_NULL_VALUE
-                                return
-                            }
-                            currentVal[i] = indexes[i].nextInt()
-                            i++
+                        next = minValue
+                        for (i in 0 until currentVal.size) {
+                            currentVal[i] =
+                                    if (!indexes[i].hasNext()) IntArrayList.DEFAULT_NULL_VALUE
+                                    else indexes[i].nextInt()
                         }
                     } else {
-                        i = 0
-                        while (i < indexes.size) {
-                            if (currentVal[i] >= id2Yield) {
-                                while (currentVal[i] > id2Yield) {
-                                    if (!indexes[i].hasNext()) {
-                                        next = IntArrayList.DEFAULT_NULL_VALUE
-                                        return
-                                    }
-                                    currentVal[i] = indexes[i].nextInt()
-                                }
+                        for (i in 0 until currentVal.size) {
+                            while (currentVal[i] >= minValue) {
+                                currentVal[i] =
+                                        if (!indexes[i].hasNext()) IntArrayList.DEFAULT_NULL_VALUE
+                                        else indexes[i].nextInt()
                             }
-                            i++
                         }
                     }
                 }
-                next = newNext
             }
         }
 
@@ -159,7 +150,7 @@ fun joinIterators(indexes: List<IntIterator>): IntIterator =
                 findNext()
             }
 
-            override fun hasNext() = next !=IntArrayList.DEFAULT_NULL_VALUE
+            override fun hasNext() = next != IntArrayList.DEFAULT_NULL_VALUE
 
             override fun nextInt(): Int {
                 val next = this.next
@@ -191,10 +182,10 @@ fun joinIterators(indexes: List<IntIterator>): IntIterator =
                         return
                     }
                     nextNext = maxValue
-                    var i=0
+                    var i = 0
                     //many with maxvalue possible
-                    while(i<currentVal.size) {
-                        if (currentVal[i]==maxValue) {
+                    while (i < currentVal.size) {
+                        if (currentVal[i] == maxValue) {
                             if (currentVal[i] != IntArrayList.DEFAULT_NULL_VALUE) {
                                 currentVal[i] = if (!indexes[i].hasNext()) {
                                     IntArrayList.DEFAULT_NULL_VALUE
@@ -203,6 +194,7 @@ fun joinIterators(indexes: List<IntIterator>): IntIterator =
                                 }
                             }
                         }
+                        i++
                     }
                 }
                 next = nextNext
