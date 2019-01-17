@@ -123,7 +123,7 @@ fun Array<IntArrayList>?.getPartitionedIterator(): IntIterator {
                     curList--
                     continue
                 }
-                next = lists[curList][curNum]
+                next = lists[curList].getInt(curNum)
                 curNum++
                 return
             }

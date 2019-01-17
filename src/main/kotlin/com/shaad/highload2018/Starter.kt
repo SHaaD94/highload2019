@@ -32,6 +32,15 @@ fun main(args: Array<String>) {
     println("Total snames: ${snamesIdCounter.get()}")
     println("--------")
 
+//    repeat(10000){
+//
+//        val iterator = birthIndex[1998].getPartitionedIterator()
+//
+//        while(iterator.hasNext()){
+//            iterator.nextInt()
+//        }
+//    }
+
     injector.getInstance(Server::class.java)
         .listen(System.getProperty("shaad.port")?.toInt() ?: 80)
 
