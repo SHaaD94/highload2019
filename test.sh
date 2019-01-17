@@ -2,4 +2,4 @@
 cp build/libs/server.jar etc/docker/server.jar
 cd etc/docker
 sudo docker build . -t stor.highloadcup.ru/accounts/shiny_guest
-sudo docker run --rm -v /tmp/data:/tmp/data -p 80:80 -m=2G --memory-swap=2G stor.highloadcup.ru/accounts/shiny_guest
+sudo docker run --rm -v /tmp/data:/tmp/data -p 80:80 -m=2G --cpus=4 --memory-swap=2G stor.highloadcup.ru/accounts/shiny_guest

@@ -32,12 +32,12 @@ CMD ["java", \
      "-XX:MaxMetaspaceSize=64m",\
 #     "-XX:SurvivorRatio=6",\
 \
-     "-XX:MaxNewSize=500m",\
-     "-XX:NewSize=500m",\
+     "-XX:MaxNewSize=400m",\
+     "-XX:NewSize=400m",\
 #     "-XX:-UseAdaptiveSizePolicy",\
 \
-     "-Xmx1700m",\
-     "-Xms1700m",\
+     "-Xmx1600m",\
+     "-Xms1600m",\
      "-Xss228k",\
 \
      "-jar", "app.jar"]

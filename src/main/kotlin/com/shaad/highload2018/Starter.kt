@@ -37,7 +37,9 @@ fun main(args: Array<String>) {
 
     System.gc()
 
-    Heater().warmUp()
+    measureTimeAndReturnResult("Warmed up in") {
+        Heater().warmUp()
+    }
 
     System.gc()
 }
