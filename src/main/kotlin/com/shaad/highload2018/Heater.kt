@@ -29,7 +29,7 @@ class Heater {
             "$localhost/accounts/10048/suggest/?city=Рособирск&limit=10",
             "$localhost/accounts/18111/suggest/?country=Росизия&limit=12",
             "$localhost/accounts/10439/recommend/?city=Амстеродам&limit=20"
-        ).forEach { url -> repeat(5000) { get(url) } }
+        ).forEach { url -> repeat(2500) { get(url) } }
 //
         listOf(
             "$localhost/accounts/10178/?query_id=18",

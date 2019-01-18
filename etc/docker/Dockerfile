@@ -32,8 +32,8 @@ CMD ["java", \
      "-XX:MaxMetaspaceSize=64m",\
 #     "-XX:SurvivorRatio=6",\
 \
-     "-XX:MaxNewSize=400m",\
-     "-XX:NewSize=400m",\
+     "-XX:MaxNewSize=200m",\
+     "-XX:NewSize=200m",\
 #     "-XX:-UseAdaptiveSizePolicy",\
 \
      "-Xmx1600m",\

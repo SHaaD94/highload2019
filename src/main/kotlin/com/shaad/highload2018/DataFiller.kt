@@ -6,7 +6,6 @@ import com.shaad.highload2018.domain.Account
 import com.shaad.highload2018.repository.addAccount
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.atomic.AtomicInteger
@@ -35,19 +34,14 @@ class DataFiller {
         }
 
         val counter = AtomicInteger(0)
-        (0..2).map {
-            GlobalScope.launch {
-                for (id in accounts) {
-                    addAccount(id)
-                    if (counter.incrementAndGet() % 50_000 == 0) {
-                        println("Processed $counter accounts")
-                    }
-                    if (counter.get() % 100_000 == 0) {
-                        System.gc()
-                    }
-                }
+        for (id in accounts) {
+            addAccount(id)
+            if (counter.incrementAndGet() % 50_000 == 0) {
+                println("Processed $counter accounts")
             }
-        }.joinAll()
-
+            if (counter.get() % 100_000 == 0) {
+                System.gc()
+            }
+        }
     }
 }

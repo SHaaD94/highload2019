@@ -22,7 +22,9 @@ fun main(args: Array<String>) {
         "$localhost/accounts/group/?keys=sex,country&order=1&birth=1999&limit=10",
         "$localhost/accounts/group/?keys=interests,city&order=1&birth=1999&limit=10",
         "$localhost/accounts/10439/recommend/?city=Амстеродам&limit=20",
-        "$localhost/accounts/11084/recommend/?country=Росмаль&limit=16"
+        "$localhost/accounts/11084/recommend/?country=Росмаль&limit=16",
+        "$localhost/accounts/10400/suggest/?limit=18&city=Барсостан",
+        "$localhost/accounts/17399/suggest/?limit=16"
     )
 
     val context = Executors.newFixedThreadPool(64).asCoroutineDispatcher()

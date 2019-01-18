@@ -38,20 +38,24 @@ fun addAccount(account: Account) {
                 intArray
             },
             account.likes?.let {
-                val intArray = IntArrayList()
-                for (i in 0 until it.size){
+                val intArray = IntArrayList(it.size, IntArrayList.DEFAULT_NULL_VALUE)
+                val intTsArray = IntArrayList(it.size, IntArrayList.DEFAULT_NULL_VALUE)
+                for (i in 0 until it.size) {
                     intArray.addInt(it[i].id)
-                    intArray.addInt(it[i].ts)
+                    intTsArray.addInt(it[i].ts)
                 }
                 intArray
+            },
+            account.likes?.let {
+                val intTsArray = IntArrayList(it.size, IntArrayList.DEFAULT_NULL_VALUE)
+                for (i in 0 until it.size) {
+                    intTsArray.addInt(it[i].ts)
+                }
+                intTsArray
             }
         )
         when {
-            account.id < 250_000 -> accounts0_250[account.id] = innerAccount
-            account.id in 250_000 until 500_000 -> accounts250_500[account.id - 250_000] = innerAccount
-            account.id in 500_000 until 750_000 -> accounts500_750[account.id - 500_000] = innerAccount
-            account.id in 750_000 until 1_000_000 -> accounts750_1000[account.id - 750_000] = innerAccount
-            account.id in 1_000_000 until 1_300_000 -> accounts1000_1300[account.id - 1_000_000] = innerAccount
+            account.id < 1_300_000 -> accountsIndex[(account.id / 50_000)][account.id % 50_000] = innerAccount
             else -> accounts1300[account.id] = innerAccount
         }
     }
@@ -139,11 +143,7 @@ fun addAccount(account: Account) {
     measureTimeAndReturnResult("like index:") {
         (account.likes ?: emptyList()).forEach { (likeIdInt, _) ->
             var collection = when {
-                likeIdInt < 250_000 -> likeIndex0_250[likeIdInt]
-                likeIdInt in 250_000 until 500_000 -> likeIndex250_500[likeIdInt - 250_000]
-                likeIdInt in 500_000 until 750_000 -> likeIndex500_750[likeIdInt - 500_000]
-                likeIdInt in 750_000 until 1_000_000 -> likeIndex750_1000[likeIdInt - 750_000]
-                likeIdInt in 1_000_000 until 1_300_000 -> likeIndex1000_1300[likeIdInt - 1_000_000]
+                likeIdInt < 1_300_000-> likeIndex[(likeIdInt / 50_000)][likeIdInt % 50_000]
                 else -> null
             }
             if (collection == null) {

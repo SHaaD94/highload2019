@@ -58,5 +58,6 @@ class InnerAccount(
     val phone: ByteArray?,
     val premium: Premium?,
     val interests: IntArrayList?,
-    val likes: IntArrayList?
+    val likes: IntArrayList?,
+    val likeTs: IntArrayList?
 )

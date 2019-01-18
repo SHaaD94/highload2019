@@ -4,7 +4,8 @@ import org.agrona.collections.IntArrayList
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 
-val moscowTimeZone = ZoneOffset.ofHours(3)
+val moscowTimeZone = ZoneOffset.UTC
+
 fun parsePhoneCode(phone: String): String {
     var code = ""
     var scrapping = false

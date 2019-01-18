@@ -26,8 +26,6 @@ class AccountsSuggest: HandlerBase() {
     private val snameBytes = "\"sname\":\"".toByteArray()
     private val statusBytes = "\"status\":\"".toByteArray()
     private val birthBytes = "\"birth\":".toByteArray()
-    private val premiumStart = "\"premium\":{\"start\":".toByteArray()
-    private val premiumFinish = ",\"finish\":".toByteArray()
 
     override fun method(): HttpVerb = HttpVerb.GET
 
@@ -67,10 +65,6 @@ class AccountsSuggest: HandlerBase() {
                     .append(statusBytes)
                     .append(statusesInv[acc.status]!!.toByteArray())
                     .append(quotes)
-                    .append(comma)
-                    //birth
-                    .append(birthBytes)
-                    .append(acc.birth)
                 if (acc.fname != null) {
                     val fname = fnamesInv[acc.fname]
                     if (fname != null) {

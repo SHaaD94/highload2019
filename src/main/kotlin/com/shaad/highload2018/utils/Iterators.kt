@@ -213,7 +213,7 @@ fun IntArrayList.intIterator(): IntIterator = object : IntIterator() {
     private var index = 0
     override fun hasNext() = index < this@intIterator.size
     override fun nextInt() = try {
-        this@intIterator[index++]
+        this@intIterator.getInt(index++)
     } catch (e: ArrayIndexOutOfBoundsException) {
         index -= 1; throw NoSuchElementException(e.message)
     }

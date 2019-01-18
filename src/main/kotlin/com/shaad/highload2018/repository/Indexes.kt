@@ -10,12 +10,11 @@ import kotlin.math.absoluteValue
 var maxId = 0
 
 // indexes
-val accounts0_250 = Array<InnerAccount?>(250_000) { null }
-val accounts250_500 = Array<InnerAccount?>(250_000) { null }
-val accounts500_750 = Array<InnerAccount?>(250_000) { null }
-val accounts750_1000 = Array<InnerAccount?>(250_000) { null }
-val accounts1000_1300 = Array<InnerAccount?>(300_000) { null }
+val accountsIndex = Array(26) { Array<InnerAccount?>(50_000) { null } }
 val accounts1300 = ConcurrentHashMap<Int, InnerAccount>(30_000)
+
+val likeIndex = Array(26) { Array(50_000) { IntArrayList() } }
+val likeIndex1300 = ConcurrentHashMap<Int, IntArrayList>(30_000)
 
 val statusIndex = Array(4) { Array(20) { IntArrayList() } }
 
@@ -41,13 +40,6 @@ val joinedIndex = Array(10) { Array(20) { IntArrayList() } }
 val interestIndex = Array(200) { Array(20) { IntArrayList() } }
 
 val premiumNowIndex = Array(20) { IntArrayList() }
-
-val likeIndex0_250 = Array<IntArrayList>(250_000) { IntArrayList() }
-val likeIndex250_500 = Array<IntArrayList>(250_000) { IntArrayList() }
-val likeIndex500_750 = Array<IntArrayList>(250_000) { IntArrayList() }
-val likeIndex750_1000 = Array<IntArrayList>(250_000) { IntArrayList() }
-val likeIndex1000_1300 = Array<IntArrayList>(300_000) { IntArrayList() }
-val likeIndex1300 = ConcurrentHashMap<Int, IntArrayList>(30_000)
 
 //normalization entities
 val citiesIdCounter = AtomicInteger()
@@ -138,23 +130,14 @@ fun getLexIndex(char: Char) = when (char) {
     else -> throw RuntimeException("Unknown char $char")
 }
 
-fun getLikesByIndex(likeId: Int): IntArrayList? =
+fun getLikesByIndex(id: Int): IntArrayList? =
     when {
-        likeId < 250_000 -> likeIndex0_250[likeId]
-        likeId in 250_000 until 500_000 -> likeIndex250_500[likeId - 250_000]
-        likeId in 500_000 until 750_000 -> likeIndex500_750[likeId - 500_000]
-        likeId in 750_000 until 1_000_000 -> likeIndex750_1000[likeId - 750_000]
-        likeId in 1_000_000 until 1_300_000 -> likeIndex1000_1300[likeId - 1_000_000]
-
-        else -> likeIndex1300[likeId]
+        id < 1_300_000 -> likeIndex[(id / 50_000)][id % 50_000]
+        else -> likeIndex1300[id]
     }
 
 fun getAccountByIndex(id: Int): InnerAccount? = when {
-    id < 250_000 -> accounts0_250[id]
-    id in 250_000 until 500_000 -> accounts250_500[id - 250_000]
-    id in 500_000 until 750_000 -> accounts500_750[id - 500_000]
-    id in 750_000 until 1_000_000 -> accounts750_1000[id - 750_000]
-    id in 1_000_000 until 1_300_000 -> accounts1000_1300[id - 1_000_000]
+    id < 1_300_000 -> accountsIndex[(id / 50_000)][id % 50_000]
     else -> accounts1300[id]
 }
 
