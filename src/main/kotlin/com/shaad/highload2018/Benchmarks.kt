@@ -1,10 +1,15 @@
 package com.shaad.highload2018
 
+import com.squareup.okhttp.Callback
 import com.squareup.okhttp.OkHttpClient
 import com.squareup.okhttp.Request
+import com.squareup.okhttp.Response
 import kotlinx.coroutines.*
+import java.io.IOException
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.min
 
 fun main(args: Array<String>) {
     val localhost = "http://127.0.0.1:${System.getProperty("shaad.port") ?: 80}"
@@ -15,7 +20,9 @@ fun main(args: Array<String>) {
         "$localhost/accounts/filter/?sex_eq=m&birth_gt=773949382&country_null=0&status_neq=свободны&limit=10",
         "$localhost/accounts/group/?keys=status,city&order=-1&status=свободны&limit=50",
         "$localhost/accounts/group/?keys=sex,country&order=1&birth=1999&limit=10",
-        "$localhost/accounts/group/?keys=interests,city&order=1&birth=1999&limit=10"
+        "$localhost/accounts/group/?keys=interests,city&order=1&birth=1999&limit=10",
+        "$localhost/accounts/10439/recommend/?city=Амстеродам&limit=20",
+        "$localhost/accounts/11084/recommend/?country=Росмаль&limit=16"
     )
 
     val context = Executors.newFixedThreadPool(64).asCoroutineDispatcher()
@@ -32,10 +39,12 @@ fun main(args: Array<String>) {
         repeat(64) { number ->
             launch(context) {
                 val client = OkHttpClient()
+                client.setReadTimeout(2,TimeUnit.SECONDS)
                 while (true) {
                     if (counter.get() > 2000) {
                         continue
                     }
+
                     val call = client.newCall(
                         Request.Builder().get().url(urls[number % urls.size - 1])
                             .build()

@@ -78,3 +78,17 @@ fun searchClosest(target: Int, nums: IntArrayList): Int {
 
     return i
 }
+
+fun checkBirthYear(year: Int): Int = when {
+    year > 99 -> 99
+    year < 0 -> 0
+    else -> year
+}
+
+fun filterByNull(nill: Boolean?, property: Any?) =
+    if (nill != null) {
+        when (nill) {
+            true -> property != null
+            false -> property == null
+        }
+    } else true

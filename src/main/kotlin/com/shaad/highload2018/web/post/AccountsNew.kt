@@ -1,7 +1,5 @@
 package com.shaad.highload2018.web.post
 
-import com.google.inject.Inject
-import com.shaad.highload2018.repository.AccountRepository
 import com.shaad.highload2018.web.HandlerAnswer
 import com.shaad.highload2018.web.HandlerBase
 import org.rapidoid.buffer.Buf
@@ -9,7 +7,7 @@ import org.rapidoid.bytes.BytesUtil
 import org.rapidoid.data.BufRange
 import org.rapidoid.http.HttpVerb
 
-class AccountsNew @Inject constructor(private val accountsRepository: AccountRepository) : HandlerBase() {
+class AccountsNew : HandlerBase() {
     private val path = "/accounts/new/".toByteArray()
 
     private val okResponse = HandlerAnswer(201, emptyResponse)

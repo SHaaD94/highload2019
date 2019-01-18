@@ -1,6 +1,5 @@
 package com.shaad.highload2018.web.get
 
-import com.google.inject.Inject
 import com.shaad.highload2018.repository.*
 import com.shaad.highload2018.utils.ByteArrayBuilder
 import com.shaad.highload2018.web.HandlerAnswer
@@ -9,10 +8,8 @@ import org.rapidoid.buffer.Buf
 import org.rapidoid.bytes.BytesUtil
 import org.rapidoid.data.BufRange
 import org.rapidoid.http.HttpVerb
-import java.util.*
-import java.util.stream.IntStream
 
-class AccountsGroup @Inject constructor(private val accountRepository: AccountRepository) : HandlerBase() {
+class AccountsGroup : HandlerBase() {
     private val path = "/accounts/group/".toByteArray()
 
     private val groupsStart = "{\"groups\":[".toByteArray()
@@ -62,7 +59,7 @@ class AccountsGroup @Inject constructor(private val accountRepository: AccountRe
         val bytes = ByteArrayBuilder()
         bytes.append(groupsStart)
         var first = true
-        accountRepository.group(request).forEach { group ->
+        group(request).forEach { group ->
             if (first) first = false else bytes.append(comma)
             bytes
                 .append(figuredBracketOpen)

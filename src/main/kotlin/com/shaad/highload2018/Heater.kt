@@ -28,8 +28,7 @@ class Heater {
             "$localhost/accounts/group/?keys=interests&order=1&birth=1999&limit=10",
             "$localhost/accounts/10048/suggest/?city=Рособирск&limit=10",
             "$localhost/accounts/18111/suggest/?country=Росизия&limit=12",
-            "$localhost/accounts/10439/recommend/?city=Амстеродам&limit=20",
-            "$localhost/accounts/11084/recommend/?country=Росмаль&limit=16"
+            "$localhost/accounts/10439/recommend/?city=Амстеродам&limit=20"
         ).forEach { url -> repeat(5000) { get(url) } }
 //
         listOf(

@@ -1,8 +1,7 @@
 package com.shaad.highload2018.web.get
 
-import com.google.inject.Inject
-import com.shaad.highload2018.repository.AccountRepository
 import com.shaad.highload2018.repository.fnamesInv
+import com.shaad.highload2018.repository.recommend
 import com.shaad.highload2018.repository.snamesInv
 import com.shaad.highload2018.repository.statusesInv
 import com.shaad.highload2018.utils.ByteArrayBuilder
@@ -12,7 +11,7 @@ import org.rapidoid.buffer.Buf
 import org.rapidoid.data.BufRange
 import org.rapidoid.http.HttpVerb
 
-class AccountsRecommend @Inject constructor(private val accountRepository: AccountRepository) : HandlerBase() {
+class AccountsRecommend : HandlerBase() {
     private val regex = "/accounts/\\d+/recommend/".toRegex()
     private val requestPathStart = "/accounts/".toByteArray()
     private val requestPathEnd = "/recommend/".toByteArray()
@@ -50,7 +49,7 @@ class AccountsRecommend @Inject constructor(private val accountRepository: Accou
         val bytes = ByteArrayBuilder()
         var firstAccount = true
         bytes.append(accountsStart)
-        accountRepository.recommend(id, city, country, limit)
+        recommend(id, city, country, limit)
             .forEach { acc ->
                 if (firstAccount) firstAccount = false else bytes.append(comma)
                 bytes

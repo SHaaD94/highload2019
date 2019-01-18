@@ -1,6 +1,5 @@
 package com.shaad.highload2018.web.get
 
-import com.google.inject.Inject
 import com.shaad.highload2018.repository.*
 import com.shaad.highload2018.utils.ByteArrayBuilder
 import com.shaad.highload2018.web.HandlerAnswer
@@ -10,7 +9,7 @@ import org.rapidoid.bytes.BytesUtil
 import org.rapidoid.data.BufRange
 import org.rapidoid.http.HttpVerb
 
-class AccountsFilter @Inject constructor(private val repository: AccountRepository) : HandlerBase() {
+class AccountsFilter : HandlerBase() {
     private val path = "/accounts/filter/".toByteArray()
 
     private val accountsStart = "{\"accounts\":[".toByteArray()
@@ -46,7 +45,7 @@ class AccountsFilter @Inject constructor(private val repository: AccountReposito
         var firstAccount = true
         val bytes = ByteArrayBuilder()
         bytes.append(accountsStart)
-        repository.filter(filterRequest)
+        filter(filterRequest)
             .forEach { acc ->
                 if (firstAccount) firstAccount = false else bytes.append(comma)
                 bytes

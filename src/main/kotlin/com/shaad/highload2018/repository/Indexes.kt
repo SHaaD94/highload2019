@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.absoluteValue
 
+@Volatile
+var maxId = 0
+
 // indexes
 val accounts0_250 = Array<InnerAccount?>(250_000) { null }
 val accounts250_500 = Array<InnerAccount?>(250_000) { null }

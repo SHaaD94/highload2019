@@ -2,9 +2,8 @@ package com.shaad.highload2018
 
 
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.google.inject.Inject
 import com.shaad.highload2018.domain.Account
-import com.shaad.highload2018.repository.AccountRepository
+import com.shaad.highload2018.repository.addAccount
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.joinAll
@@ -15,7 +14,7 @@ import java.util.zip.ZipFile
 
 private class Accounts(val accounts: List<Account>)
 
-class DataFiller @Inject constructor(private val accountRepository: AccountRepository) {
+class DataFiller {
     private val dataPath = System.getProperty("shaad.tempdir") ?: "/tmp/data/data.zip"
 
     fun fill() = runBlocking {
@@ -39,7 +38,7 @@ class DataFiller @Inject constructor(private val accountRepository: AccountRepos
         (0..2).map {
             GlobalScope.launch {
                 for (id in accounts) {
-                    accountRepository.addAccount(id)
+                    addAccount(id)
                     if (counter.incrementAndGet() % 50_000 == 0) {
                         println("Processed $counter accounts")
                     }

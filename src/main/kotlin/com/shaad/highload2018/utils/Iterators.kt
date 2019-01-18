@@ -1,7 +1,13 @@
 package com.shaad.highload2018.utils
 
+import com.shaad.highload2018.repository.maxId
 import org.agrona.collections.IntArrayList
 
+fun fullIdsIterator() = object : IntIterator() {
+    private var cur = maxId
+    override fun nextInt() = cur--
+    override fun hasNext() = cur > 0
+}
 
 object EmptyIterator : Iterator<Nothing> {
     override fun hasNext() = false

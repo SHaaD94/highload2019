@@ -1,10 +1,7 @@
 package com.shaad.highload2018.configuration
 
 import com.google.inject.AbstractModule
-import com.google.inject.Singleton
 import com.google.inject.multibindings.Multibinder
-import com.shaad.highload2018.repository.AccountRepository
-import com.shaad.highload2018.repository.AccountRepositoryImpl
 import com.shaad.highload2018.web.Handler
 import com.shaad.highload2018.web.get.AccountsFilter
 import com.shaad.highload2018.web.get.AccountsGroup
@@ -24,7 +21,5 @@ class BaseModule : AbstractModule() {
         multibinder.addBinding().to(AccountsLikes::class.java)
         multibinder.addBinding().to(AccountsNew::class.java)
         multibinder.addBinding().to(AccountsUpdate::class.java)
-
-        bind(AccountRepository::class.java).to(AccountRepositoryImpl::class.java).`in`(Singleton::class.java)
     }
 }
