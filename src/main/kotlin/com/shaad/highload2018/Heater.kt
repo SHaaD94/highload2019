@@ -25,19 +25,21 @@ class Heater {
             "$localhost/accounts/filter/?limit=10&city_null=0&sex_eq=f&email_domain=mail.ru&premium_null=1&birth_year=1994&status_neq=1",
             "$localhost/accounts/filter/?sex_eq=m&birth_gt=773949382&country_null=0&status_neq=свободны&limit=10",
             "$localhost/accounts/group/?keys=city&order=-1&status=свободны&limit=50",
-            "$localhost/accounts/group/?keys=interests&order=1&birth=1999&limit=10",
-            "$localhost/accounts/10048/suggest/?city=Рособирск&limit=10",
-            "$localhost/accounts/18111/suggest/?country=Росизия&limit=12",
-            "$localhost/accounts/10439/recommend/?city=Амстеродам&limit=20"
-        ).forEach { url -> repeat(2500) { get(url) } }
+            "$localhost/accounts/group/?keys=interests&order=1&birth=1999&limit=10"
+        ).forEach { url -> repeat(5000) { get(url) } }
+        println("first part of get warmed up")
+//        listOf(
+//            "$localhost/accounts/10048/suggest/?city=Рособирск&limit=10",
+//            "$localhost/accounts/18111/suggest/?country=Росизия&limit=12",
+//            "$localhost/accounts/10439/recommend/?city=Амстеродам&limit=20"
+//        ).forEach { url -> repeat(500) { get(url) } }
+//        println("second part of get warmed up")
 //
         listOf(
             "$localhost/accounts/10178/?query_id=18",
             "$localhost/accounts/10544/?query_id=8",
             "$localhost/accounts/likes/?query_id=11"
         ).forEach { url -> repeat(10) { post(url) } }
-
-        println("Warmed up!")
     }
 
     private fun get(url: String) {

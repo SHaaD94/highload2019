@@ -10,6 +10,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.min
+import kotlin.random.Random
 
 fun main(args: Array<String>) {
     val localhost = "http://127.0.0.1:${System.getProperty("shaad.port") ?: 80}"
@@ -23,7 +24,7 @@ fun main(args: Array<String>) {
         "$localhost/accounts/group/?keys=interests,city&order=1&birth=1999&limit=10",
         "$localhost/accounts/10439/recommend/?city=Амстеродам&limit=20",
         "$localhost/accounts/11084/recommend/?country=Росмаль&limit=16",
-        "$localhost/accounts/10400/suggest/?limit=18&city=Барсостан",
+//        "$localhost/accounts/10400/suggest/?limit=18&city=Барсостан",
         "$localhost/accounts/17399/suggest/?limit=16"
     )
 
@@ -43,33 +44,34 @@ fun main(args: Array<String>) {
                 val client = OkHttpClient()
                 client.setReadTimeout(2,TimeUnit.SECONDS)
                 while (true) {
-                    if (counter.get() > 2000) {
+                    if (counter.get() > 100) {
                         continue
                     }
+                    val url = urls[Random.nextInt(urls.size-1)]
 
                     val call = client.newCall(
-                        Request.Builder().get().url(urls[number % urls.size - 1])
+                        Request.Builder().get().url(url)
                             .build()
                     )
 
                     counter.incrementAndGet()
 
-                    call.execute().let {
-                        it.body().close()
-                        if (it.code() != 200) {
-                            println(urls[number % urls.size - 1] + " is not successful")
-                        }
-                    }
+//                    call.execute().let {
+//                        it.body().close()
+//                        if (it.code() != 200) {
+//                            println("$url is not successful")
+//                        }
+//                    }
 
-//                    call.enqueue(object : Callback {
-//                        override fun onFailure(request: Request?, e: IOException?) {
-//                            println(urls[min(number % urls.size - 1,0) ] + " is not successful")
-//                        }
-//
-//                        override fun onResponse(response: Response?) {
-//                            response!!.body().close()
-//                        }
-//                    })
+                    call.enqueue(object : Callback {
+                        override fun onFailure(request: Request?, e: IOException?) {
+                            println("$url is not successful")
+                        }
+
+                        override fun onResponse(response: Response?) {
+                            response!!.body().close()
+                        }
+                    })
                 }
 
             }
