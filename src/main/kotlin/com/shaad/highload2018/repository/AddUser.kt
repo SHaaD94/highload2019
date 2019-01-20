@@ -6,8 +6,28 @@ import com.shaad.highload2018.utils.addToSortedCollection
 import com.shaad.highload2018.utils.getYear
 import com.shaad.highload2018.utils.measureTimeAndReturnResult
 import com.shaad.highload2018.utils.parsePhoneCode
+import com.wizzardo.tools.json.JsonArray
+import com.wizzardo.tools.json.JsonObject
 import org.agrona.collections.IntArrayList
 
+fun addUser(
+    id: Int,
+    newEmail: String,
+    newFname: String,
+    newSname: String,
+    newPhone: String,
+    newSex: String,
+    newBirth: Int,
+    newJoined: Int,
+    newCity: String,
+    newCountry: String,
+    newStatus: String,
+    newInterests: JsonArray?,
+    newPremium: JsonObject?,
+    newLikes: JsonArray?
+) {
+
+}
 
 fun addAccount(account: Account) {
     check(getAccountByIndex(account.id) == null) { "User ${account.id} already exists" }

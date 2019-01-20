@@ -39,12 +39,12 @@ fun main(args: Array<String>) {
                 delay(999)
             }
         }
-        repeat(64) { number ->
+        repeat(10) { number ->
             launch(context) {
                 val client = OkHttpClient()
                 client.setReadTimeout(2,TimeUnit.SECONDS)
                 while (true) {
-                    if (counter.get() > 100) {
+                    if (counter.get() > 300) {
                         continue
                     }
                     val url = urls[Random.nextInt(urls.size-1)]
@@ -55,7 +55,7 @@ fun main(args: Array<String>) {
                     )
 
                     counter.incrementAndGet()
-
+//
 //                    call.execute().let {
 //                        it.body().close()
 //                        if (it.code() != 200) {

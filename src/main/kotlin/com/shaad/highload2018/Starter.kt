@@ -9,6 +9,9 @@ import com.shaad.highload2018.repository.fnamesIdCounter
 import com.shaad.highload2018.repository.snamesIdCounter
 import com.shaad.highload2018.utils.measureTimeAndReturnResult
 import com.shaad.highload2018.web.Server
+import java.io.File
+import java.nio.charset.Charset
+import kotlin.concurrent.fixedRateTimer
 
 
 fun main(args: Array<String>) {
@@ -16,6 +19,16 @@ fun main(args: Array<String>) {
         Stage.PRODUCTION,
         BaseModule()
     )
+
+    fixedRateTimer("free memory monitor", true, 0, 5_000) {
+        try {
+//            println("UsedMemory: ${File("/sys/fs/cgroup/memory/memory.usage_in_bytes").readText().toLong() / 1024.0 / 1024.0}")
+//            println("UsedMemory: ${File("/proc/meminfo").inputStream().readBytes().toString(Charset.defaultCharset())}")
+            println("UsedMemory: ${File("/proc/self/stat").inputStream().readBytes().toString(Charset.defaultCharset())}")
+        }catch (e:Exception){
+            e.printStackTrace()
+        }
+    }
 
     measureTimeAndReturnResult("Filling is finished in") {
         injector.getInstance(DataFiller::class.java).fill()
