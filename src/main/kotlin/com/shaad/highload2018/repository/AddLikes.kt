@@ -5,6 +5,7 @@ import org.agrona.collections.IntArrayList
 
 fun addLike(likee: Int, ts: Int, liker: Int) {
     val account = getAccountByIndex(liker)!!
+    check(getAccountByIndex(likee) != null) { "Likee does not exist" }
     if (account.likes == null) {
         account.likes = IntArrayList()
     }

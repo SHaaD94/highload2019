@@ -1,6 +1,6 @@
 package com.shaad.highload2018.web.post
 
-import com.shaad.highload2018.repository.updateUser
+import com.shaad.highload2018.repository.*
 import com.shaad.highload2018.web.HandlerAnswer
 import com.shaad.highload2018.web.HandlerBase
 import com.wizzardo.tools.json.JsonTools
@@ -45,15 +45,15 @@ class AccountsUpdate : HandlerBase() {
             updateUser(
                 id,
                 newEmail,
-                newFname,
-                newSname,
+                newFname?.let { writeNormalizationIndex(fnames, fnamesInv, fnamesIdCounter, it) },
+                newSname?.let { writeNormalizationIndex(snames, snamesInv, snamesIdCounter, it) },
                 newPhone,
-                newSex,
+                newSex?.let { sex2Int(it[0]) },
                 newBirth,
                 newJoined,
-                newCity,
-                newCountry,
-                newStatus,
+                newCity?.let { writeNormalizationIndex(cities, citiesInv, citiesIdCounter, it) },
+                newCountry?.let { writeNormalizationIndex(countries, countriesInv, countriesIdCounter, it) },
+                newStatus?.let { writeNormalizationIndex(statuses, statusesInv, statusesIdCounter, it) },
                 newInterests,
                 newPremium,
                 newLikes

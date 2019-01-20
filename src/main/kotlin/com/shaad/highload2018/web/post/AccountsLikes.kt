@@ -16,6 +16,8 @@ class AccountsLikes : HandlerBase() {
     override fun matches(buf: Buf, pathRange: BufRange): Boolean =
         BytesUtil.match(buf.bytes(), pathRange.start, path, true)
 
+    private val okResponse = HandlerAnswer(202, emptyResponse)
+
     override fun process(buf: Buf, pathRange: BufRange, paramsRange: BufRange, bodyRange: BufRange): HandlerAnswer =
         try {
             val body = JsonTools.parse(buf[bodyRange]).asJsonObject()
@@ -28,8 +30,7 @@ class AccountsLikes : HandlerBase() {
                 addLike(likee, ts, liker)
             }
 
-
-            HandlerAnswer(202, emptyResponse)
+            okResponse
         } catch (e: Exception) {
             HandlerAnswer(400, emptyResponse)
         }

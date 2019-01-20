@@ -53,7 +53,7 @@ class AccountsNew : HandlerBase() {
                 newPremium,
                 newLikes
             )
-            return HandlerAnswer(201, emptyResponse)
+            return okResponse
         } catch (e: Exception) {
             HandlerAnswer(400, emptyResponse)
         }

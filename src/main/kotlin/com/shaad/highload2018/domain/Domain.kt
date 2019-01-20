@@ -45,7 +45,7 @@ data class Premium(val start: Int, val finish: Int) {
 
 data class Like(val id: Int, val ts: Int)
 
-class InnerAccount(
+data class InnerAccount(
     val id: Int,
     val status: Int,
     val email: ByteArray,
