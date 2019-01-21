@@ -23,7 +23,7 @@ fun suggest(id: Int, city: String?, country: String?, limit: Int): Sequence<Inne
         return emptySequence()
     }
 
-    val likes = joinIterators(specifiedAcc.likes.map { getLikesByIndex(it)!!.intIterator() })
+    val likes = joinIterators(specifiedAcc.likes!!.map { getLikesByIndex(it)!!.intIterator() })
 
     val indexes = ArrayList<IntIterator>(4)
     indexes.add(likes)
@@ -48,8 +48,8 @@ fun suggest(id: Int, city: String?, country: String?, limit: Int): Sequence<Inne
         var counter = 0.0
         //todo: optimization point - sort likes by id desc?
         for (i in 0 until acc.likes!!.size) {
-            for (j in 0 until specifiedAcc.likes.size) {
-                if (specifiedAcc.likes.getInt(j) == acc.likes.getInt(i)) {
+            for (j in 0 until specifiedAcc.likes!!.size) {
+                if (specifiedAcc.likes!!.getInt(j) == acc.likes!!.getInt(i)) {
                     points += abs(specifiedAcc.likeTs!!.getInt(j) - acc.likeTs!!.getInt(i))
                     counter += 1.0
                 }
@@ -67,7 +67,7 @@ fun suggest(id: Int, city: String?, country: String?, limit: Int): Sequence<Inne
     while (cId > 0 && users.size < limit) {
         cId--
         val a = getAccountByIndex(cId) ?: continue
-        if (!specifiedAcc.likes.containsInt(a.id) && maxSimilarUser!!.likes!!.containsInt(a.id)) {
+        if (!specifiedAcc.likes!!.containsInt(a.id) && maxSimilarUser!!.likes!!.containsInt(a.id)) {
             users.add(a)
         }
     }
